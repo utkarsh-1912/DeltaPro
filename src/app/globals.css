@@ -33,11 +33,11 @@
     --sidebar-accent-foreground: var(--secondary-foreground);
     --sidebar-border: var(--border);
     --sidebar-ring: var(--ring);
-    --chart-1: var(--primary);
-    --chart-2: var(--primary);
-    --chart-3: var(--primary);
-    --chart-4: var(--primary);
-    --chart-5: var(--primary);
+    --chart-1: 218 60% 44.1%;
+    --chart-2: 180 55% 40%;
+    --chart-3: 30 90% 50%;
+    --chart-4: 260 65% 55%;
+    --chart-5: 340 85% 60%;
   }
   .dark {
     --background: 224 71% 4%;
