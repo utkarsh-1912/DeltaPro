@@ -825,7 +825,7 @@ export function RotaMatrix() {
                                         const member1Id = gen.manualSwaps![0].memberId1;
                                         const member2Id = gen.manualSwaps![0].memberId2;
                                         const shift1 = shiftMap.get(gen.assignments[member2Id])?.name || 'N/A';
-                                        const shift2 = shiftMap.get(gen.assignments[member1Id])?.name || 'N A';
+                                        const shift2 = shiftMap.get(gen.assignments[member1Id])?.name || 'N/A';
 
                                         const canCancel = React.useMemo(() => {
                                             if (!activeGeneration || !details) return false;
@@ -968,5 +968,7 @@ export function RotaMatrix() {
         </TooltipProvider>
     )
 }
+
+    
 
     
