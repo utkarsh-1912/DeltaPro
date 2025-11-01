@@ -6,16 +6,170 @@ import React from "react";
 import { useRotaStore, useRotaStoreActions } from "@/lib/store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, parseISO, startOfWeek, endOfWeek, addDays, isWithinInterval, isSaturday } from "date-fns";
+import { format, parseISO, startOfWeek, endOfWeek, addDays, isWithinInterval, isSaturday, subMonths, isAfter } from "date-fns";
 import { Badge } from "../ui/badge";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious, PaginationFirst, PaginationLast } from "../ui/pagination";
-import { Recycle, Download, ArrowRightLeft, LifeBuoy, CalendarDays, Undo2 } from "lucide-react";
+import { Recycle, Download, ArrowRightLeft, LifeBuoy, CalendarDays, Undo2, PieChart, BarChart } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
 import { downloadCsv } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { RotaGeneration, Shift, TeamMember } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { Bar, Pie, Cell, ResponsiveContainer, BarChart as RechartsBarChart, PieChart as RechartsPieChart, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+
+const CHART_COLORS = [
+    "hsl(var(--chart-1))",
+    "hsl(var(--chart-2))",
+    "hsl(var(--chart-3))",
+    "hsl(var(--chart-4))",
+    "hsl(var(--chart-5))",
+];
+
+function AnalyticsDashboard() {
+    const { teamMembers, shifts, generationHistory, activeGenerationId, weekendRotas } = useRotaStore();
+    
+    const memberMap = React.useMemo(() => new Map(teamMembers.map(m => [m.id, m])), [teamMembers]);
+    const shiftMap = React.useMemo(() => new Map(shifts.map(s => [s.id, s])), [shifts]);
+    
+    const activeGeneration = React.useMemo(() => 
+        generationHistory.find(g => g.id === activeGenerationId)
+    , [generationHistory, activeGenerationId]);
+
+    // Data for Active Rota Shift Distribution (Pie Chart)
+    const activeRotaDistribution = React.useMemo(() => {
+        if (!activeGeneration) return [];
+        const counts: { [shiftName: string]: number } = {};
+        shifts.forEach(s => counts[s.name] = 0);
+
+        Object.values(activeGeneration.assignments).forEach(shiftId => {
+            if (shiftId) {
+                const shiftName = shiftMap.get(shiftId)?.name;
+                if (shiftName) {
+                    counts[shiftName] = (counts[shiftName] || 0) + 1;
+                }
+            }
+        });
+        
+        return Object.entries(counts).map(([name, value], index) => ({
+            name,
+            value,
+            fill: CHART_COLORS[index % CHART_COLORS.length]
+        })).filter(item => item.value > 0);
+    }, [activeGeneration, shifts, shiftMap]);
+
+    // Data for Quarterly Duties (Bar Charts)
+    const quarterlyDuties = React.useMemo(() => {
+        const threeMonthsAgo = subMonths(new Date(), 3);
+        const weekendCounts: Record<string, number> = {};
+        const adhocCounts: Record<string, number> = {};
+
+        teamMembers.forEach(m => {
+            weekendCounts[m.id] = 0;
+            adhocCounts[m.id] = 0;
+        });
+
+        weekendRotas.forEach(rota => {
+            if (isAfter(parseISO(rota.date), threeMonthsAgo)) {
+                weekendCounts[rota.memberId]++;
+            }
+        });
+
+        generationHistory.forEach(gen => {
+            if (isAfter(parseISO(gen.startDate), threeMonthsAgo) && gen.adhoc) {
+                Object.entries(gen.adhoc).forEach(([memberId, weekData]) => {
+                    const dutyCount = Object.values(weekData).filter(v => v).length;
+                    adhocCounts[memberId] = (adhocCounts[memberId] || 0) + dutyCount;
+                });
+            }
+        });
+
+        const weekendData = Object.entries(weekendCounts).map(([memberId, count]) => ({
+            name: memberMap.get(memberId)?.name || 'Unknown',
+            duties: count
+        })).filter(d => d.duties > 0);
+
+        const adhocData = Object.entries(adhocCounts).map(([memberId, count]) => ({
+            name: memberMap.get(memberId)?.name || 'Unknown',
+            duties: count
+        })).filter(d => d.duties > 0);
+        
+        return { weekendData, adhocData };
+
+    }, [generationHistory, weekendRotas, teamMembers, memberMap]);
+
+    const chartConfig = {
+        duties: { label: "Duties" },
+    };
+
+    return (
+        <div className="mb-6">
+            <Card>
+                <CardHeader>
+                    <CardTitle>Analytics Dashboard</CardTitle>
+                    <CardDescription>
+                        Visual insights into your team's scheduling metrics.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg"><PieChart/> Active Rota Shift Distribution</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             {activeRotaDistribution.length > 0 ? (
+                                <ChartContainer config={{}} className="h-[250px] w-full">
+                                    <RechartsPieChart>
+                                        <RechartsTooltip content={<ChartTooltipContent hideLabel />} />
+                                        <Pie data={activeRotaDistribution} dataKey="value" nameKey="name" innerRadius={50}>
+                                            {activeRotaDistribution.map((entry, index) => (
+                                                <Cell key={`cell-${index}`} fill={entry.fill} />
+                                            ))}
+                                        </Pie>
+                                    </RechartsPieChart>
+                                </ChartContainer>
+                             ) : (
+                                <div className="h-[250px] flex items-center justify-center text-muted-foreground">No active rota to display.</div>
+                             )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Quarterly Weekend Duties</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                             <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                                <RechartsBarChart data={quarterlyDuties.weekendData} accessibilityLayer>
+                                    <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
+                                    <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                    <Bar dataKey="duties" fill="var(--chart-1)" radius={4} />
+                                </RechartsBarChart>
+                            </ChartContainer>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Quarterly Ad-hoc Duties</CardTitle>
+                        </CardHeader>
+                         <CardContent>
+                             <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                                <RechartsBarChart data={quarterlyDuties.adhocData} accessibilityLayer>
+                                    <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
+                                    <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                    <Bar dataKey="duties" fill="var(--chart-2)" radius={4} />
+                                </RechartsBarChart>
+                            </ChartContainer>
+                        </CardContent>
+                    </Card>
+                </CardContent>
+            </Card>
+        </div>
+    );
+}
+
 
 function getSwapDetails(gen: RotaGeneration, shiftMap: Map<string, Shift>, memberMap: Map<string, TeamMember>) {
     if (!gen.manualSwaps || gen.manualSwaps.length === 0) {
@@ -293,6 +447,8 @@ export function RotaMatrix() {
     
     return (
         <TooltipProvider>
+            <AnalyticsDashboard />
+
             <Card>
                 <CardHeader className="flex-row items-center justify-between">
                     <div>
@@ -669,7 +825,7 @@ export function RotaMatrix() {
                                         const member1Id = gen.manualSwaps![0].memberId1;
                                         const member2Id = gen.manualSwaps![0].memberId2;
                                         const shift1 = shiftMap.get(gen.assignments[member2Id])?.name || 'N/A';
-                                        const shift2 = shiftMap.get(gen.assignments[member1Id])?.name || 'N/A';
+                                        const shift2 = shiftMap.get(gen.assignments[member1Id])?.name || 'N A';
 
                                         const canCancel = React.useMemo(() => {
                                             if (!activeGeneration || !details) return false;
@@ -812,3 +968,5 @@ export function RotaMatrix() {
         </TooltipProvider>
     )
 }
+
+    
