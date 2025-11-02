@@ -28,7 +28,13 @@ const CHART_COLORS = [
 ];
 
 function AnalyticsDashboard() {
-    const { teamMembers, shifts, generationHistory, activeGenerationId, weekendRotas } = useRotaStore();
+    const { teamMembers, shifts, generationHistory, activeGenerationId, weekendRotas } = useRotaStore(state => ({
+        teamMembers: state.teamMembers,
+        shifts: state.shifts,
+        generationHistory: state.generationHistory,
+        activeGenerationId: state.activeGenerationId,
+        weekendRotas: state.weekendRotas,
+    }));
     
     const memberMap = React.useMemo(() => new Map(teamMembers.map(m => [m.id, m])), [teamMembers]);
     const shiftMap = React.useMemo(() => new Map(shifts.map(s => [s.id, s])), [shifts]);
