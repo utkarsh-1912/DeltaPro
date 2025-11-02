@@ -95,7 +95,7 @@ function AnalyticsDashboard() {
             }))
             .filter(d => Object.values(d).some(v => typeof v === 'number' && v > 0));
 
-    }, [generationHistory, teamMembers, shifts, memberMap]);
+    }, [generationHistory, teamMembers, shifts, memberMap, shiftMap]);
 
     // Data for Quarterly Ad-hoc Duties (Bar Chart)
     const quarterlyAdhocDuties = React.useMemo(() => {
@@ -185,7 +185,7 @@ function AnalyticsDashboard() {
                                             dataKey={shift.name} 
                                             stackId="a" 
                                             fill={shift.color.startsWith('var(') ? shift.color.replace('var(--', 'hsl(var(--').slice(0,-1) : shift.color} 
-                                            radius={[4, 4, 0, 0]}
+                                            radius={4}
                                           />
                                         ))}
                                    </RechartsBarChart>
