@@ -71,14 +71,9 @@ function AnalyticsDashboard() {
         const weekendCounts: Record<string, number> = {};
         const adhocCounts: Record<string, number> = {};
 
-        teamMembers.forEach(m => {
-            weekendCounts[m.id] = 0;
-            adhocCounts[m.id] = 0;
-        });
-
         weekendRotas.forEach(rota => {
             if (isAfter(parseISO(rota.date), threeMonthsAgo)) {
-                weekendCounts[rota.memberId]++;
+                weekendCounts[rota.memberId] = (weekendCounts[rota.memberId] || 0) + 1;
             }
         });
 
@@ -86,7 +81,9 @@ function AnalyticsDashboard() {
             if (isAfter(parseISO(gen.startDate), threeMonthsAgo) && gen.adhoc) {
                 Object.entries(gen.adhoc).forEach(([memberId, weekData]) => {
                     const dutyCount = Object.values(weekData).filter(v => v).length;
-                    adhocCounts[memberId] = (adhocCounts[memberId] || 0) + dutyCount;
+                    if (dutyCount > 0) {
+                      adhocCounts[memberId] = (adhocCounts[memberId] || 0) + dutyCount;
+                    }
                 });
             }
         });
