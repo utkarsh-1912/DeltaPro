@@ -77,7 +77,7 @@ function AnalyticsDashboard() {
         generationHistory.forEach(gen => {
             if (isAfter(parseISO(gen.startDate), threeMonthsAgo)) {
                 Object.entries(gen.assignments).forEach(([memberId, shiftId]) => {
-                    if (shiftId) {
+                    if (shiftId && memberMap.has(memberId)) {
                         const shiftName = shiftMap.get(shiftId)?.name;
                         if (shiftName) {
                              if (!memberShiftCounts[memberId]) memberShiftCounts[memberId] = {};
@@ -105,9 +105,11 @@ function AnalyticsDashboard() {
         generationHistory.forEach(gen => {
             if (isAfter(parseISO(gen.startDate), threeMonthsAgo) && gen.adhoc) {
                 Object.entries(gen.adhoc).forEach(([memberId, weekData]) => {
-                    const dutyCount = Object.values(weekData).filter(v => v).length;
-                    if (dutyCount > 0) {
-                      adhocCounts[memberId] = (adhocCounts[memberId] || 0) + dutyCount;
+                    if (memberMap.has(memberId)) {
+                        const dutyCount = Object.values(weekData).filter(v => v).length;
+                        if (dutyCount > 0) {
+                        adhocCounts[memberId] = (adhocCounts[memberId] || 0) + dutyCount;
+                        }
                     }
                 });
             }
@@ -176,7 +178,7 @@ function AnalyticsDashboard() {
                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
                                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                       <Legend />
+                                       <Legend verticalAlign="top" />
                                         {shifts.map((shift) => (
                                           <Bar 
                                             key={shift.id} 
@@ -199,12 +201,12 @@ function AnalyticsDashboard() {
                         </CardHeader>
                          <CardContent>
                              {quarterlyAdhocDuties.length > 0 ? (
-                                <ChartContainer config={{duties: {label: "Duties"}}} className="h-[250px] w-full">
+                                <ChartContainer config={{duties: {label: "Duties", color: "hsl(var(--chart-2))"}}} className="h-[250px] w-full">
                                     <RechartsBarChart data={quarterlyAdhocDuties} accessibilityLayer>
                                         <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
                                         <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
                                         <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                        <Bar dataKey="duties" fill="hsl(var(--primary))" radius={4} />
+                                        <Bar dataKey="duties" fill="var(--color-duties)" radius={4} />
                                     </RechartsBarChart>
                                 </ChartContainer>
                               ) : (
