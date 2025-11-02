@@ -178,7 +178,7 @@ function AnalyticsDashboard() {
                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
                                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                       <Legend verticalAlign="top" />
+                                       <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '16px' }} />
                                         {shifts.map((shift) => (
                                           <Bar 
                                             key={shift.id} 
