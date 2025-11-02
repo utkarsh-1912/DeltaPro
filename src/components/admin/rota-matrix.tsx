@@ -65,17 +65,42 @@ function AnalyticsDashboard() {
         })).filter(item => item.value > 0);
     }, [activeGeneration, shifts, shiftMap]);
 
-    // Data for Quarterly Duties (Bar Charts)
-    const quarterlyDuties = React.useMemo(() => {
+    // Data for Quarterly Shift Distribution (Stacked Bar Chart)
+    const quarterlyShiftDistribution = React.useMemo(() => {
         const threeMonthsAgo = subMonths(new Date(), 3);
-        const weekendCounts: Record<string, number> = {};
-        const adhocCounts: Record<string, number> = {};
+        const memberShiftCounts: Record<string, Record<string, number>> = {};
+        
+        teamMembers.forEach(member => {
+            memberShiftCounts[member.id] = {};
+        });
 
-        weekendRotas.forEach(rota => {
-            if (isAfter(parseISO(rota.date), threeMonthsAgo)) {
-                weekendCounts[rota.memberId] = (weekendCounts[rota.memberId] || 0) + 1;
+        generationHistory.forEach(gen => {
+            if (isAfter(parseISO(gen.startDate), threeMonthsAgo)) {
+                Object.entries(gen.assignments).forEach(([memberId, shiftId]) => {
+                    if (shiftId) {
+                        const shiftName = shiftMap.get(shiftId)?.name;
+                        if (shiftName) {
+                             if (!memberShiftCounts[memberId]) memberShiftCounts[memberId] = {};
+                            memberShiftCounts[memberId][shiftName] = (memberShiftCounts[memberId][shiftName] || 0) + 1;
+                        }
+                    }
+                });
             }
         });
+
+        return Object.entries(memberShiftCounts)
+            .map(([memberId, shiftCounts]) => ({
+                name: memberMap.get(memberId)?.name || 'Unknown',
+                ...shiftCounts
+            }))
+            .filter(d => Object.values(d).some(v => typeof v === 'number' && v > 0));
+
+    }, [generationHistory, teamMembers, shifts, memberMap]);
+
+    // Data for Quarterly Ad-hoc Duties (Bar Chart)
+    const quarterlyAdhocDuties = React.useMemo(() => {
+        const threeMonthsAgo = subMonths(new Date(), 3);
+        const adhocCounts: Record<string, number> = {};
 
         generationHistory.forEach(gen => {
             if (isAfter(parseISO(gen.startDate), threeMonthsAgo) && gen.adhoc) {
@@ -87,24 +112,26 @@ function AnalyticsDashboard() {
                 });
             }
         });
-
-        const weekendData = Object.entries(weekendCounts).map(([memberId, count]) => ({
-            name: memberMap.get(memberId)?.name || 'Unknown',
-            duties: count
-        })).filter(d => d.duties > 0);
-
-        const adhocData = Object.entries(adhocCounts).map(([memberId, count]) => ({
-            name: memberMap.get(memberId)?.name || 'Unknown',
-            duties: count
-        })).filter(d => d.duties > 0);
         
-        return { weekendData, adhocData };
+        return Object.entries(adhocCounts)
+            .map(([memberId, count]) => ({
+                name: memberMap.get(memberId)?.name || 'Unknown',
+                duties: count
+            }))
+            .filter(d => d.duties > 0);
 
-    }, [generationHistory, weekendRotas, teamMembers, memberMap]);
-
-    const chartConfig = {
-        duties: { label: "Duties" },
-    };
+    }, [generationHistory, teamMembers, memberMap]);
+    
+    const shiftChartConfig = React.useMemo(() => {
+        const config: any = {};
+        shifts.forEach(shift => {
+            config[shift.name] = {
+                label: shift.name,
+                color: shift.color.startsWith('var(') ? shift.color.replace('var(--', 'hsl(var(--').slice(0,-1) : shift.color
+            };
+        });
+        return config;
+    }, [shifts]);
 
     return (
         <div className="mb-6">
@@ -130,6 +157,7 @@ function AnalyticsDashboard() {
                                                 <Cell key={`cell-${index}`} fill={entry.fill} />
                                             ))}
                                         </Pie>
+                                        <Legend />
                                     </RechartsPieChart>
                                 </ChartContainer>
                              ) : (
@@ -139,21 +167,30 @@ function AnalyticsDashboard() {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Weekend Duties (Last 3 Months)</CardTitle>
+                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/>Shift Duties (Last 3 Months)</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            {quarterlyDuties.weekendData.length > 0 ? (
-                                <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                                    <RechartsBarChart data={quarterlyDuties.weekendData} accessibilityLayer>
-                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
-                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
-                                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                        <Bar dataKey="duties" fill="hsl(var(--primary))" radius={4} />
-                                    </RechartsBarChart>
-                                </ChartContainer>
-                            ) : (
-                                <div className="h-[250px] flex items-center justify-center text-muted-foreground">No duty data from the last 3 months.</div>
-                            )}
+                           {quarterlyShiftDistribution.length > 0 ? (
+                               <ChartContainer config={shiftChartConfig} className="h-[250px] w-full">
+                                   <RechartsBarChart data={quarterlyShiftDistribution} accessibilityLayer>
+                                       <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
+                                       <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                                       <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                       <Legend />
+                                        {shifts.map((shift) => (
+                                          <Bar 
+                                            key={shift.id} 
+                                            dataKey={shift.name} 
+                                            stackId="a" 
+                                            fill={shift.color.startsWith('var(') ? shift.color.replace('var(--', 'hsl(var(--').slice(0,-1) : shift.color} 
+                                            radius={[4, 4, 0, 0]}
+                                          />
+                                        ))}
+                                   </RechartsBarChart>
+                               </ChartContainer>
+                           ) : (
+                               <div className="h-[250px] flex items-center justify-center text-muted-foreground">No duty data from the last 3 months.</div>
+                           )}
                         </CardContent>
                     </Card>
                     <Card>
@@ -161,9 +198,9 @@ function AnalyticsDashboard() {
                             <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Ad-hoc Duties (Last 3 Months)</CardTitle>
                         </CardHeader>
                          <CardContent>
-                             {quarterlyDuties.adhocData.length > 0 ? (
-                                <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                                    <RechartsBarChart data={quarterlyDuties.adhocData} accessibilityLayer>
+                             {quarterlyAdhocDuties.length > 0 ? (
+                                <ChartContainer config={{duties: {label: "Duties"}}} className="h-[250px] w-full">
+                                    <RechartsBarChart data={quarterlyAdhocDuties} accessibilityLayer>
                                         <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
                                         <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
                                         <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
