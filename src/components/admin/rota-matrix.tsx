@@ -136,32 +136,40 @@ function AnalyticsDashboard() {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Quarterly Weekend Duties</CardTitle>
+                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Weekend Duties (Last 3 Months)</CardTitle>
                         </CardHeader>
                         <CardContent>
-                             <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                                <RechartsBarChart data={quarterlyDuties.weekendData} accessibilityLayer>
-                                    <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
-                                    <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
-                                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                    <Bar dataKey="duties" fill="var(--chart-1)" radius={4} />
-                                </RechartsBarChart>
-                            </ChartContainer>
+                            {quarterlyDuties.weekendData.length > 0 ? (
+                                <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                                    <RechartsBarChart data={quarterlyDuties.weekendData} accessibilityLayer>
+                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
+                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                        <Bar dataKey="duties" fill="hsl(var(--primary))" radius={4} />
+                                    </RechartsBarChart>
+                                </ChartContainer>
+                            ) : (
+                                <div className="h-[250px] flex items-center justify-center text-muted-foreground">No duty data from the last 3 months.</div>
+                            )}
                         </CardContent>
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Quarterly Ad-hoc Duties</CardTitle>
+                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Ad-hoc Duties (Last 3 Months)</CardTitle>
                         </CardHeader>
                          <CardContent>
-                             <ChartContainer config={chartConfig} className="h-[250px] w-full">
-                                <RechartsBarChart data={quarterlyDuties.adhocData} accessibilityLayer>
-                                    <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
-                                    <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
-                                    <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                    <Bar dataKey="duties" fill="var(--chart-2)" radius={4} />
-                                </RechartsBarChart>
-                            </ChartContainer>
+                             {quarterlyDuties.adhocData.length > 0 ? (
+                                <ChartContainer config={chartConfig} className="h-[250px] w-full">
+                                    <RechartsBarChart data={quarterlyDuties.adhocData} accessibilityLayer>
+                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
+                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                        <Bar dataKey="duties" fill="hsl(var(--primary))" radius={4} />
+                                    </RechartsBarChart>
+                                </ChartContainer>
+                              ) : (
+                                <div className="h-[250px] flex items-center justify-center text-muted-foreground">No duty data from the last 3 months.</div>
+                              )}
                         </CardContent>
                     </Card>
                 </CardContent>
