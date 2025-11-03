@@ -15,7 +15,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { ListChecks, ListTree, Users, LifeBuoy, CalendarDays } from "lucide-react";
+import { ListChecks, ListTree, Users, LifeBuoy, CalendarDays, CalendarOff } from "lucide-react";
 import Link from "next/link";
 
 export default function GuidePage() {
@@ -64,8 +64,34 @@ export default function GuidePage() {
             <AccordionItem value="item-2">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
+                    <CalendarOff className="h-5 w-5 text-primary shrink-0" />
+                    Step 2: Schedule Team Leave
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="text-base leading-relaxed pl-8 pt-2">
+                <p className="mb-4">Go to the <Link href="/leave" className="font-semibold text-primary hover:underline">Leave Matrix</Link> to log any upcoming holidays or other leave for your team members.</p>
+                <ul className="list-disc space-y-2 pl-6 mb-6">
+                  <li>In the <span className="font-semibold">Schedule Leave</span> section, select a team member from the dropdown.</li>
+                  <li>Click the date input to open the calendar and select a start date, end date, or a range for the leave period.</li>
+                  <li>Choose the <span className="font-semibold">Leave Type</span> (e.g., Holiday, Sick Leave).</li>
+                  <li>Click <span className="font-semibold">Add Leave</span>.</li>
+                  <li>Scheduled leave will be considered during rota generation. If a member's leave is shorter than the rota period, they will still be assigned a shift, but a comment will be added to their assignment.</li>
+                </ul>
+                <h4 className="font-semibold mb-2 text-primary">Managing Leave</h4>
+                 <ul className="list-disc space-y-2 pl-6">
+                  <li>The <span className="font-semibold">Scheduled Leave</span> table shows all entries.</li>
+                  <li>Use the search bar to filter by a member's name.</li>
+                  <li>You can <span className="font-semibold">Export</span> the full leave history as a CSV file.</li>
+                  <li>Use the trash icon to delete a leave entry.</li>
+                </ul>
+              </AccordionContent>
+            </AccordionItem>
+            
+            <AccordionItem value="item-3">
+              <AccordionTrigger className="text-lg font-semibold">
+                <div className="flex items-center gap-3">
                     <ListChecks className="h-5 w-5 text-primary shrink-0" />
-                    Step 2: Generate & Manage Your Rota
+                    Step 3: Generate & Manage Your Rota
                 </div>
               </AccordionTrigger>
               <AccordionContent className="text-base leading-relaxed pl-8 pt-2">
@@ -86,11 +112,11 @@ export default function GuidePage() {
               </AccordionContent>
             </AccordionItem>
             
-            <AccordionItem value="item-3">
+            <AccordionItem value="item-4">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                     <LifeBuoy className="h-5 w-5 text-primary shrink-0" />
-                    Step 3: Plan Ad-hoc & Weekend Rotas
+                    Step 4: Plan Ad-hoc & Weekend Rotas
                 </div>
               </AccordionTrigger>
               <AccordionContent className="text-base leading-relaxed pl-8 pt-2">
@@ -112,17 +138,17 @@ export default function GuidePage() {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-4">
+            <AccordionItem value="item-5">
               <AccordionTrigger className="text-lg font-semibold">
                 <div className="flex items-center gap-3">
                     <ListTree className="h-5 w-5 text-primary shrink-0" />
-                    Step 4: Analyze Rota History
+                    Step 5: Analyze Rota History
                 </div>
               </AccordionTrigger>
               <AccordionContent className="text-base leading-relaxed pl-8 pt-2">
                 <p className="mb-4">Use the <Link href="/matrix" className="font-semibold text-primary hover:underline">Rota Matrix</Link> page to see a long-term view of assignments and ensure fairness.</p>
                 <ul className="list-disc space-y-2 pl-6">
-                    <li>The matrix displays historical tables for the main shift rota, ad-hoc support rota, and weekend rota.</li>
+                    <li>The matrix displays historical tables for the main shift rota, ad-hoc support rota, weekend rota, and leave data.</li>
                     <li>Quickly see who was assigned to which shift or duty and when. Use the pagination to navigate through history.</li>
                     <li>The <span className="font-semibold">Manual Swap History</span> table at the bottom logs all manual shift swaps. Use the <span className="font-semibold">Cancel Out</span> action to reverse a past swap in the current rota, helping maintain fairness over time.</li>
                 </ul>
