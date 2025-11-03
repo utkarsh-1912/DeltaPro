@@ -52,6 +52,12 @@ export default function LeavePage() {
         (currentPage + 1) * itemsPerPage
     );
 
+    React.useEffect(() => {
+        if (paginatedLeave.length === 0 && currentPage > 0) {
+            setCurrentPage(prev => prev - 1);
+        }
+    }, [paginatedLeave.length, currentPage]);
+
     const handleAddLeave = () => {
         if (!memberId || !dateRange?.from) {
             toast({
@@ -321,6 +327,8 @@ export default function LeavePage() {
         </motion.div>
     )
 }
+
+    
 
     
 
