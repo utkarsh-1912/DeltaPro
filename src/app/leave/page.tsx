@@ -4,7 +4,7 @@
 import React from "react";
 import { useRotaStore, useRotaStoreActions } from "@/lib/store";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -18,6 +18,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { motion } from "framer-motion";
 import { Input } from "@/components/ui/input";
 import { downloadCsv } from "@/lib/utils";
+import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious, PaginationFirst, PaginationLast } from "@/components/ui/pagination";
+
 
 export default function LeavePage() {
     const { teamMembers, leave } = useRotaStore();
@@ -28,6 +30,8 @@ export default function LeavePage() {
     const [dateRange, setDateRange] = React.useState<DateRange | undefined>();
     const [leaveType, setLeaveType] = React.useState<'Holiday' | 'Sick Leave' | 'Other'>('Holiday');
     const [searchTerm, setSearchTerm] = React.useState("");
+    const [currentPage, setCurrentPage] = React.useState(0);
+    const itemsPerPage = 10;
 
     const memberMap = React.useMemo(() => new Map(teamMembers.map(m => [m.id, m.name])), [teamMembers]);
     
@@ -41,6 +45,12 @@ export default function LeavePage() {
             return memberName.includes(searchTerm.toLowerCase());
         });
     }, [leave, searchTerm, memberMap]);
+
+    const pageCount = Math.ceil(sortedAndFilteredLeave.length / itemsPerPage);
+    const paginatedLeave = sortedAndFilteredLeave.slice(
+        currentPage * itemsPerPage,
+        (currentPage + 1) * itemsPerPage
+    );
 
     const handleAddLeave = () => {
         if (!memberId || !dateRange?.from) {
@@ -236,7 +246,7 @@ export default function LeavePage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {sortedAndFilteredLeave.length > 0 ? sortedAndFilteredLeave.map(l => (
+                                {paginatedLeave.length > 0 ? paginatedLeave.map(l => (
                                     <TableRow key={l.id}>
                                         <TableCell className="font-medium">{memberMap.get(l.memberId) || 'Unknown Member'}</TableCell>
                                         <TableCell className="whitespace-nowrap">{format(parseISO(l.startDate), 'd MMM yyyy')} - {format(parseISO(l.endDate), 'd MMM yyyy')}</TableCell>
@@ -270,7 +280,46 @@ export default function LeavePage() {
                         </Table>
                     </div>
                 </CardContent>
+                {pageCount > 1 && (
+                    <CardFooter>
+                        <Pagination>
+                            <PaginationContent>
+                                <PaginationItem>
+                                    <PaginationFirst 
+                                        onClick={() => setCurrentPage(0)}
+                                        className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <PaginationPrevious 
+                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))} 
+                                        className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <span className="text-sm font-medium">
+                                        Page {currentPage + 1} of {pageCount}
+                                    </span>
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <PaginationNext 
+                                        onClick={() => setCurrentPage(prev => Math.min(pageCount - 1, prev + 1))}
+                                        className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <PaginationLast 
+                                        onClick={() => setCurrentPage(pageCount - 1)}
+                                        className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                            </PaginationContent>
+                        </Pagination>
+                    </CardFooter>
+                )}
             </Card>
         </motion.div>
     )
 }
+
+    
