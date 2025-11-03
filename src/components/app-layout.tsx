@@ -273,11 +273,11 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <SidebarMenuButton
                 asChild
                 isActive={pathname.startsWith("/leave")}
-                tooltip="Leave"
+                tooltip="Leave Matrix"
               >
                 <Link href="/leave">
                   <CalendarOff />
-                  <span className="group-data-[collapsible=icon]:hidden">Leave</span>
+                  <span className="group-data-[collapsible=icon]:hidden">Leave Matrix</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

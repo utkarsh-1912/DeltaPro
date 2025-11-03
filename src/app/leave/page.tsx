@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from "react";
@@ -30,19 +29,24 @@ export default function LeavePage() {
     const sortedLeave = React.useMemo(() => [...leave].sort((a,b) => parseISO(b.startDate).getTime() - parseISO(a.startDate).getTime()), [leave]);
 
     const handleAddLeave = () => {
-        if (!memberId || !dateRange?.from || !dateRange?.to) {
+        if (!memberId || !dateRange?.from) {
             toast({
                 variant: "destructive",
                 title: "Incomplete Information",
-                description: "Please select a team member and a full date range.",
+                description: "Please select a team member and a date or date range.",
             });
             return;
         }
 
+        const finalDateRange = {
+            from: dateRange.from,
+            to: dateRange.to || dateRange.from
+        };
+
         addLeave({
             memberId,
-            startDate: dateRange.from.toISOString(),
-            endDate: dateRange.to.toISOString(),
+            startDate: finalDateRange.from.toISOString(),
+            endDate: finalDateRange.to.toISOString(),
             type: leaveType,
         });
 
@@ -51,6 +55,24 @@ export default function LeavePage() {
         setDateRange(undefined);
         setLeaveType('Holiday');
     };
+    
+     const handleDateSelect = (range: DateRange | undefined) => {
+        if (range?.from && !range.to) {
+            // If user clicks a single date after already having a range, reset to single day
+             if(dateRange?.from && dateRange?.to) {
+                setDateRange({ from: range.from, to: undefined });
+                return;
+             }
+            // If they click the same day twice, it means they want a single day. `onSelect` gives `to: undefined`.
+            // We set it to the same day to make it an explicit single-day range.
+            if (dateRange?.from && range.from.getTime() === dateRange.from.getTime()) {
+                 setDateRange({ from: range.from, to: range.from });
+                 return;
+            }
+        }
+        setDateRange(range);
+    }
+
 
     return (
         <motion.div
@@ -61,7 +83,7 @@ export default function LeavePage() {
         >
             <Card className="md:col-span-2">
                 <CardHeader>
-                    <CardTitle>Leave & Holiday Management</CardTitle>
+                    <CardTitle>Leave Matrix</CardTitle>
                     <CardDescription>Schedule and track time off for your team members. Scheduled leave will automatically be considered during rota generation.</CardDescription>
                 </CardHeader>
             </Card>
@@ -118,7 +140,7 @@ export default function LeavePage() {
                                     mode="range"
                                     defaultMonth={dateRange?.from}
                                     selected={dateRange}
-                                    onSelect={setDateRange}
+                                    onSelect={handleDateSelect}
                                     numberOfMonths={2}
                                 />
                                 </PopoverContent>
@@ -150,7 +172,7 @@ export default function LeavePage() {
                     <CardDescription>A log of all upcoming and past leave.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-auto rounded-lg border max-h-96">
+                    <div className="overflow-auto rounded-lg border max-h-[calc(100vh-22rem)]">
                         <Table>
                             <TableHeader>
                                 <TableRow>
