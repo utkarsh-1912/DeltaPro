@@ -6,15 +6,15 @@ import React from "react";
 import { useRotaStore, useRotaStoreActions } from "@/lib/store";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { format, parseISO, startOfWeek, endOfWeek, addDays, isWithinInterval, isSaturday, subMonths, isAfter } from "date-fns";
+import { format, parseISO, startOfWeek, endOfWeek, addDays, isWithinInterval, isSaturday, subMonths, isAfter, eachDayOfInterval, isSameDay } from "date-fns";
 import { Badge } from "../ui/badge";
 import { Pagination, PaginationContent, PaginationItem, PaginationNext, PaginationPrevious, PaginationFirst, PaginationLast } from "../ui/pagination";
-import { Recycle, Download, ArrowRightLeft, LifeBuoy, CalendarDays, Undo2, PieChart, BarChart } from "lucide-react";
+import { Recycle, Download, ArrowRightLeft, LifeBuoy, CalendarDays, Undo2, PieChart, BarChart, CalendarOff } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "../ui/tooltip";
 import { Button } from "../ui/button";
 import { downloadCsv } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import type { RotaGeneration, Shift, TeamMember } from "@/lib/types";
+import type { RotaGeneration, Shift, TeamMember, Leave } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Bar, Pie, Cell, ResponsiveContainer, BarChart as RechartsBarChart, PieChart as RechartsPieChart, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
@@ -276,7 +276,7 @@ function getWeeklyBreakdown(gen: RotaGeneration) {
 
 
 export function RotaMatrix() {
-    const { generationHistory, shifts, weekendRotas, activeGenerationId } = useRotaStore();
+    const { generationHistory, shifts, weekendRotas, activeGenerationId, leave } = useRotaStore();
     const { swapShifts, toggleSwapNeutralization, swapWeekendAssignments, toggleWeekendSwapNeutralization } = useRotaStoreActions();
     const [currentPage, setCurrentPage] = React.useState(0);
     const { toast } = useToast();
@@ -346,9 +346,8 @@ export function RotaMatrix() {
             .filter((item): item is NonNullable<typeof item> => item !== null),
     [sortedHistory, memberMap]);
 
-
-    const supportMatrixHeaders = React.useMemo(() => {
-        const headers: {label: string, genId: string, weekIndex: number, isLastInGroup: boolean}[] = [];
+    const matrixHeaders = React.useMemo(() => {
+        const headers: {label: string, genId: string, weekIndex: number, isLastInGroup: boolean, weekInterval: {start: Date, end: Date}}[] = [];
         paginatedHistory.forEach((gen, genIndex) => {
             const weeks = getWeeklyBreakdown(gen);
             weeks.forEach((week, weekIndex) => {
@@ -356,7 +355,8 @@ export function RotaMatrix() {
                     label: `${format(week.start, 'd')}-${format(week.end, 'd MMM')}`,
                     genId: gen.id,
                     weekIndex: week.weekIndex,
-                    isLastInGroup: weekIndex === weeks.length - 1 && genIndex < paginatedHistory.length - 1
+                    isLastInGroup: weekIndex === weeks.length - 1 && genIndex < paginatedHistory.length - 1,
+                    weekInterval: week
                 });
             });
         });
@@ -493,6 +493,42 @@ export function RotaMatrix() {
             title: "Export Successful",
             description: "The complete weekend rota history has been downloaded as a CSV file.",
         });
+    };
+
+    const handleLeaveExport = () => {
+        const allWeeksHeaders: {label: string, weekInterval: {start: Date, end: Date}}[] = [];
+        sortedHistory.forEach((gen) => {
+            const weeks = getWeeklyBreakdown(gen);
+            weeks.forEach((week) => {
+                allWeeksHeaders.push({
+                    label: `${format(week.start, 'd MMM')} - ${format(week.end, 'd MMM yyyy')}`,
+                    weekInterval: week
+                });
+            });
+        });
+
+        if (leave.length === 0) {
+            toast({ variant: "destructive", title: "Export Failed", description: "There is no leave data to export." });
+            return;
+        }
+
+        const header = ["Week", "Total Members on Leave"];
+        const rows = allWeeksHeaders.map(header => {
+            const weekDays = eachDayOfInterval(header.weekInterval);
+            const membersOnLeaveThisWeek = new Set<string>();
+            leave.forEach(l => {
+                const leaveInterval = { start: parseISO(l.startDate), end: parseISO(l.endDate) };
+                const leaveDays = eachDayOfInterval(leaveInterval);
+                const onLeaveInWeek = leaveDays.some(leaveDay => weekDays.some(weekDay => isSameDay(leaveDay, weekDay)));
+                if(onLeaveInWeek) {
+                    membersOnLeaveThisWeek.add(l.memberId);
+                }
+            });
+            return [header.label, membersOnLeaveThisWeek.size];
+        });
+
+        downloadCsv([header, ...rows], "leave-matrix-history.csv");
+        toast({ title: "Export Successful", description: "The leave matrix has been downloaded as a CSV file." });
     };
     
     return (
@@ -658,7 +694,7 @@ export function RotaMatrix() {
                              <TableHeader>
                                 <TableRow>
                                     <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[120px]">Member</TableHead>
-                                     {supportMatrixHeaders.map(header => (
+                                     {matrixHeaders.map(header => (
                                         <TableHead 
                                             key={`${header.genId}-${header.weekIndex}`} 
                                             className={cn(
@@ -675,7 +711,7 @@ export function RotaMatrix() {
                                  {allHistoricalMembers.map(member => (
                                     <TableRow key={member.id}>
                                         <TableCell className="font-medium sticky left-0 bg-card z-10">{member.name}</TableCell>
-                                        {supportMatrixHeaders.map(header => {
+                                        {matrixHeaders.map(header => {
                                             const gen = paginatedHistory.find(g => g.id === header.genId);
                                             const adhocAssignments = gen?.adhoc || {};
                                             const memberAdhoc = adhocAssignments[member.id];
@@ -706,7 +742,7 @@ export function RotaMatrix() {
                                 ))}
                                 {allHistoricalMembers.length === 0 && (
                                     <TableRow>
-                                        <TableCell colSpan={supportMatrixHeaders.length + 1} className="text-center text-muted-foreground h-24">
+                                        <TableCell colSpan={matrixHeaders.length + 1} className="text-center text-muted-foreground h-24">
                                             No team members found.
                                         </TableCell>
                                     </TableRow>
@@ -716,6 +752,115 @@ export function RotaMatrix() {
                     </div>
                 </CardContent>
                  {pageCount > 1 && (
+                    <CardFooter>
+                       <Pagination>
+                            <PaginationContent>
+                                <PaginationItem>
+                                    <PaginationFirst 
+                                        onClick={() => setCurrentPage(0)}
+                                        className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <PaginationPrevious 
+                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))} 
+                                        className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <span className="text-sm font-medium">
+                                        Page {currentPage + 1} of {pageCount}
+                                    </span>
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <PaginationNext 
+                                        onClick={() => setCurrentPage(prev => Math.min(pageCount - 1, prev + 1))}
+                                        className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                                <PaginationItem>
+                                    <PaginationLast 
+                                        onClick={() => setCurrentPage(pageCount - 1)}
+                                        className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
+                                    />
+                                </PaginationItem>
+                            </PaginationContent>
+                        </Pagination>
+                    </CardFooter>
+                )}
+            </Card>
+
+            <Card className="mt-6">
+                <CardHeader className="flex-row items-center justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2"><CalendarOff /> Leave Matrix</CardTitle>
+                        <CardDescription>
+                            Aggregated view of team members on leave per week.
+                        </CardDescription>
+                    </div>
+                    <Button variant="outline" onClick={handleLeaveExport} disabled={leave.length === 0}>
+                        <Download /> Export as CSV
+                    </Button>
+                </CardHeader>
+                <CardContent>
+                    <div className="overflow-x-auto rounded-lg border">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[120px]">Rota Period</TableHead>
+                                    {matrixHeaders.map(header => (
+                                        <TableHead
+                                            key={`${header.genId}-${header.weekIndex}`}
+                                            className={cn(
+                                                "text-center font-semibold whitespace-nowrap p-2",
+                                                header.isLastInGroup && "border-r-2 border-border"
+                                            )}
+                                        >
+                                            {header.label}
+                                        </TableHead>
+                                    ))}
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                <TableRow>
+                                    <TableCell className="font-medium sticky left-0 bg-card z-10">Total on Leave</TableCell>
+                                    {matrixHeaders.map(header => {
+                                        const weekDays = eachDayOfInterval(header.weekInterval);
+                                        const membersOnLeaveThisWeek = new Set<string>();
+
+                                        leave.forEach(l => {
+                                            const leaveInterval = { start: parseISO(l.startDate), end: parseISO(l.endDate) };
+                                            const leaveDays = eachDayOfInterval(leaveInterval);
+                                            const onLeaveInWeek = leaveDays.some(leaveDay => weekDays.some(weekDay => isSameDay(leaveDay, weekDay)));
+                                            if (onLeaveInWeek) {
+                                                membersOnLeaveThisWeek.add(l.memberId);
+                                            }
+                                        });
+
+                                        const count = membersOnLeaveThisWeek.size;
+
+                                        return (
+                                            <TableCell
+                                                key={`${header.genId}-${header.weekIndex}-leave`}
+                                                className={cn(
+                                                    "text-center p-2",
+                                                    header.isLastInGroup && "border-r-2 border-border"
+                                                )}
+                                            >
+                                                {count > 0 ? (
+                                                    <Badge variant={count > 2 ? "destructive" : "secondary"}>{count}</Badge>
+                                                ) : (
+                                                    <span className="text-muted-foreground">0</span>
+                                                )}
+                                            </TableCell>
+                                        );
+                                    })}
+                                </TableRow>
+                            </TableBody>
+                        </Table>
+                    </div>
+                </CardContent>
+                {pageCount > 1 && (
                     <CardFooter>
                        <Pagination>
                             <PaginationContent>
@@ -1022,3 +1167,4 @@ export function RotaMatrix() {
     
 
     
+
