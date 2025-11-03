@@ -235,7 +235,7 @@ export default function LeavePage() {
                     </div>
                 </CardHeader>
                 <CardContent>
-                    <div className="overflow-auto rounded-lg border max-h-[calc(100vh-28rem)]">
+                    <div className="rounded-lg border">
                         <Table>
                             <TableHeader>
                                 <TableRow>
@@ -321,5 +321,7 @@ export default function LeavePage() {
         </motion.div>
     )
 }
+
+    
 
     
