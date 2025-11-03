@@ -19,6 +19,7 @@ import { SupportRotaExportImage } from "@/components/support-rota-export-image";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { AdhocAssignments } from "@/lib/types";
+import Link from "next/link";
 
 
 type AdhocNotes = Record<string, string>;
@@ -94,23 +95,27 @@ export default function SupportRotaPage() {
                 ? "Select a rota period from the dropdown to begin planning." 
                 : "A main rota must be generated before a support rota can be planned."}
             </CardDescription>
-             {generationHistory.length > 0 && (
-                <div className="pt-4">
-                    <Select onValueChange={setSelectedGenerationId}>
-                        <SelectTrigger className="w-[280px] mx-auto">
-                            <SelectValue placeholder="Select a rota period..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {sortedHistory.map(gen => (
-                                <SelectItem key={gen.id} value={gen.id}>
-                                    {format(parseISO(gen.startDate), 'd MMM')} - {format(parseISO(gen.endDate), 'd MMM yyyy')}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-             )}
           </CardHeader>
+           <CardContent>
+            {generationHistory.length > 0 ? (
+                <Select onValueChange={setSelectedGenerationId}>
+                    <SelectTrigger className="w-[280px] mx-auto">
+                        <SelectValue placeholder="Select a rota period..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {sortedHistory.map(gen => (
+                            <SelectItem key={gen.id} value={gen.id}>
+                                {format(parseISO(gen.startDate), 'd MMM')} - {format(parseISO(gen.endDate), 'd MMM yyyy')}
+                            </SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+            ) : (
+                <Button asChild>
+                    <Link href="/dashboard">Go to Dashboard</Link>
+                </Button>
+            )}
+           </CardContent>
         </Card>
       </div>
     );
