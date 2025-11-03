@@ -39,6 +39,15 @@ export type ManualWeekendSwap = {
 // Member ID -> Week Index -> isSelected
 export type AdhocAssignments = Record<string, Record<number, boolean>>;
 
+export interface Leave {
+  id: string;
+  memberId: string;
+  startDate: string; // ISO string
+  endDate: string; // ISO string
+  type: 'Holiday' | 'Sick Leave' | 'Other';
+}
+
+
 // A single generated rota period
 export interface RotaGeneration {
   id: string; // Unique ID for this generation, e.g., a timestamp
@@ -65,6 +74,7 @@ export type ShiftStreak = Record<string, { shiftId: string | null; count: number
 export interface AppState {
   teamMembers: TeamMember[];
   shifts: Shift[];
+  leave: Leave[];
   generationHistory: RotaGeneration[];
   activeGenerationId: string | null;
   weekendRotas: WeekendRota[];
@@ -76,6 +86,8 @@ export interface AppState {
   addShift: (newShift: Omit<Shift, 'id' | 'color'>) => void;
   updateShift: (id: string, newShift: Partial<Omit<Shift, 'id' | 'color'>>) => void;
   deleteShift: (id: string) => void;
+  addLeave: (leave: Omit<Leave, 'id'>) => void;
+  deleteLeave: (leaveId: string) => void;
   updateAssignmentsForGeneration: (generationId: string, assignments: RotaAssignments, comments: Record<string, string>) => void;
   generateNewRota: (startDate: Date, rotaPeriodInWeeks: number) => void;
   swapShifts: (memberId1: string, memberId2: string, generationId?: string) => void;

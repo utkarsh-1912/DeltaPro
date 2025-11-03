@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota } from "./types";
+import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave } from "./types";
 import { startOfWeek, formatISO, parseISO, addDays, eachWeekendOfInterval, isWithinInterval, format, isSaturday } from "date-fns";
 import { generateNewRotaAssignments, balanceAssignments } from "./rotaGenerator";
 import { toast } from "@/hooks/use-toast";
@@ -24,6 +24,7 @@ const getInitialState = (): Omit<AppState, keyof ReturnType<typeof useRotaStoreA
           { id: 'us', name: 'US', startTime: '18:00', endTime: '04:00', color: 'var(--chart-3)', sequence: 3, isExtreme: true, minTeam: 1, maxTeam: 10 },
           { id: 'late_emea', name: 'LATE EMEA', startTime: '15:00', endTime: '01:00', color: 'var(--chart-4)', sequence: 2, isExtreme: false, minTeam: 1, maxTeam: 10 }
         ],
+        leave: [],
         generationHistory: [],
         activeGenerationId: null,
         weekendRotas: [],
@@ -178,6 +179,31 @@ export const useRotaStore = create<AppState>()(
         });
       },
 
+      addLeave: (leaveData) => set(state => {
+        const newLeave: Leave = {
+            id: new Date().getTime().toString(),
+            ...leaveData,
+        };
+        toast({
+            title: "Leave Added",
+            description: `Leave has been successfully scheduled.`
+        });
+        return {
+            leave: [...state.leave, newLeave]
+        }
+      }),
+
+      deleteLeave: (leaveId) => set(state => {
+        toast({
+            variant: 'destructive',
+            title: "Leave Deleted",
+            description: `The leave entry has been removed.`
+        });
+        return {
+            leave: state.leave.filter(l => l.id !== leaveId)
+        }
+      }),
+
       updateAssignmentsForGeneration: (generationId, newAssignments, newComments) => set(state => {
         const { generationHistory } = state;
         if (!generationId) return state;
@@ -236,24 +262,32 @@ export const useRotaStore = create<AppState>()(
 
       generateNewRota: (startDate: Date, rotaPeriodInWeeks: number = 2) => {
         set(state => {
-            const { teamMembers, shifts, generationHistory, lastWeekendAssigneeIndex } = state;
+            const { teamMembers, shifts, generationHistory, leave, lastWeekendAssigneeIndex } = state;
             const sortedShifts = [...shifts].sort((a,b) => a.sequence - b.sequence);
+            const newStartDate = startOfWeek(startDate, { weekStartsOn: 1 });
+            const periodInDays = rotaPeriodInWeeks * 7;
+            const newEndDate = addDays(newStartDate, periodInDays - 1);
             
+            const membersOnLeave = teamMembers.filter(member => 
+                leave.some(l => 
+                    l.memberId === member.id &&
+                    isWithinInterval(newStartDate, { start: parseISO(l.startDate), end: parseISO(l.endDate) })
+                )
+            );
+            
+            const availableMembers = teamMembers.filter(m => !membersOnLeave.some(leaveMember => leaveMember.id === m.id));
+
             const totalMinRequired = sortedShifts.reduce((acc, s) => acc + s.minTeam, 0);
-            const flexibleMemberCount = teamMembers.filter(m => !m.fixedShiftId).length;
+            const flexibleMemberCount = availableMembers.filter(m => !m.fixedShiftId).length;
 
             if (flexibleMemberCount < totalMinRequired) {
                 toast({
                     variant: "destructive",
                     title: "Staffing Warning",
-                    description: `Not enough flexible members (${flexibleMemberCount}) to meet total minimum of ${totalMinRequired}. Rota may be unbalanced.`,
+                    description: `Not enough available flexible members (${flexibleMemberCount}) to meet total minimum of ${totalMinRequired}. Rota may be unbalanced.`,
                     duration: 6000,
                 });
             }
-
-            const newStartDate = startOfWeek(startDate, { weekStartsOn: 1 });
-            const periodInDays = rotaPeriodInWeeks * 7;
-            const newEndDate = addDays(newStartDate, periodInDays - 1);
 
             const currentMemberIds = new Set(teamMembers.map(m => m.id));
             const filteredHistory = generationHistory.map(gen => ({
@@ -263,11 +297,15 @@ export const useRotaStore = create<AppState>()(
                 .reduce((obj, [key, value]) => ({ ...obj, [key]: value }), {})
             }));
 
-            const shiftStreaks = calculateShiftStreaks(teamMembers, filteredHistory);
+            const shiftStreaks = calculateShiftStreaks(availableMembers, filteredHistory);
 
-            const initialAssignments = generateNewRotaAssignments(teamMembers, sortedShifts, shiftStreaks);
+            const initialAssignments = generateNewRotaAssignments(availableMembers, sortedShifts, shiftStreaks);
             
-            const finalAssignments = balanceAssignments(initialAssignments, sortedShifts, teamMembers, shiftStreaks);
+            const finalAssignments = balanceAssignments(initialAssignments, sortedShifts, availableMembers, shiftStreaks);
+            
+            membersOnLeave.forEach(member => {
+                finalAssignments[member.id] = undefined; // Mark as 'Off'
+            });
 
             const newGeneration: RotaGeneration = {
                 id: new Date().getTime().toString(),
@@ -483,6 +521,8 @@ export const useRotaStoreActions = () => useRotaStore(state => ({
     addShift: state.addShift,
     updateShift: state.updateShift,
     deleteShift: state.deleteShift,
+    addLeave: state.addLeave,
+    deleteLeave: state.deleteLeave,
     generateNewRota: state.generateNewRota,
     swapShifts: state.swapShifts,
     toggleSwapNeutralization: state.toggleSwapNeutralization,

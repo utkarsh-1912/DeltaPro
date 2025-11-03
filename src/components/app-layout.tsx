@@ -20,7 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Settings, Moon, Sun, LogOut, ListTree, HelpCircle, User as UserIcon, LifeBuoy, CalendarDays } from "lucide-react";
+import { LayoutDashboard, Settings, Moon, Sun, LogOut, ListTree, HelpCircle, User as UserIcon, LifeBuoy, CalendarDays, CalendarOff } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "./ui/dropdown-menu";
@@ -266,6 +266,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link href="/weekend">
                   <CalendarDays />
                   <span className="group-data-[collapsible=icon]:hidden">Weekend Rota</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname.startsWith("/leave")}
+                tooltip="Leave"
+              >
+                <Link href="/leave">
+                  <CalendarOff />
+                  <span className="group-data-[collapsible=icon]:hidden">Leave</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
