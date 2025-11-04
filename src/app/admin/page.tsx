@@ -8,8 +8,24 @@ import { TeamManager } from "@/components/admin/team-manager";
 import { ShiftManager } from "@/components/admin/shift-manager";
 import { Users, Clock, Building } from "lucide-react";
 import { TeamsManager } from "@/components/admin/teams-manager";
+import { useAccessControl } from "@/hooks/use-access-control";
 
 export default function AdminPage() {
+  const { canAccessAdmin } = useAccessControl();
+
+  if (!canAccessAdmin) {
+    return (
+      <div className="p-4 sm:p-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Access Denied</CardTitle>
+            <CardDescription>You do not have permission to view this page.</CardDescription>
+          </CardHeader>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

@@ -1,5 +1,6 @@
 
 
+
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave, Team } from "./types";
@@ -111,11 +112,11 @@ export const useRotaStore = create<AppState>()(
     (set, get) => ({
       ...getInitialState(),
 
-      addTeamMember: (name, teamId, fixedShiftId) =>
+      addTeamMember: (name, email, teamId, fixedShiftId) =>
         set((state) => ({
           teamMembers: [
             ...state.teamMembers,
-            { id: new Date().getTime().toString(), name, teamId, fixedShiftId },
+            { id: new Date().getTime().toString(), name, email, teamId, fixedShiftId },
           ],
         })),
 
@@ -135,8 +136,8 @@ export const useRotaStore = create<AppState>()(
           teams: [...state.teams, { id: new Date().getTime().toString(), name }]
       })),
 
-      updateTeam: (id, name) => set(state => ({
-          teams: state.teams.map(team => team.id === id ? { ...team, name } : team)
+      updateTeam: (id, name, pmId) => set(state => ({
+          teams: state.teams.map(team => team.id === id ? { ...team, name, pmId: pmId === "none" ? undefined : pmId } : team)
       })),
       
       deleteTeam: (id) => set(state => ({

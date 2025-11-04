@@ -4,11 +4,13 @@ import type { User } from "firebase/auth";
 export interface Team {
   id: string;
   name: string;
+  pmId?: string;
 }
 
 export interface TeamMember {
   id: string;
   name: string;
+  email: string;
   teamId?: string;
   fixedShiftId?: string;
   lastShiftId?: string;
@@ -89,11 +91,11 @@ export interface AppState {
   weekendRotas: WeekendRota[];
   lastWeekendAssigneeIndex: number;
   showExportFooter: boolean;
-  addTeamMember: (name: string, teamId?: string, fixedShiftId?: string) => void;
-  updateTeamMember: (id: string, updates: Partial<Pick<TeamMember, 'name' | 'teamId' | 'fixedShiftId'>>) => void;
+  addTeamMember: (name: string, email: string, teamId?: string, fixedShiftId?: string) => void;
+  updateTeamMember: (id: string, updates: Partial<Pick<TeamMember, 'name' | 'email' | 'teamId' | 'fixedShiftId'>>) => void;
   deleteTeamMember: (id: string) => void;
   addTeam: (name: string) => void;
-  updateTeam: (id: string, name: string) => void;
+  updateTeam: (id: string, name: string, pmId?: string) => void;
   deleteTeam: (id: string) => void;
   addShift: (newShift: Omit<Shift, 'id' | 'color'>) => void;
   updateShift: (id: string, newShift: Partial<Omit<Shift, 'id' | 'color'>>) => void;
@@ -120,6 +122,7 @@ export type UserProfile = {
   email: string;
   name: string;
   isAdmin: boolean;
+  role: 'admin' | 'hr' | 'pm' | 'user';
 };
 
 export interface AuthState {

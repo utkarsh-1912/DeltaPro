@@ -45,6 +45,7 @@ import { useToast } from "@/hooks/use-toast";
 
 const memberSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters long."),
+  email: z.string().email("Invalid email address."),
   teamId: z.string().optional(),
   fixedShiftId: z.string().optional(),
 });
@@ -59,6 +60,7 @@ function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: 
     resolver: zodResolver(memberSchema),
     defaultValues: {
       name: member?.name || "",
+      email: member?.email || "",
       teamId: member?.teamId || "",
       fixedShiftId: member?.fixedShiftId || "",
     },
@@ -69,13 +71,13 @@ function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: 
     const fixedShiftId = values.fixedShiftId === "none" ? undefined : values.fixedShiftId;
 
     if (isEditMode && member) {
-      updateTeamMember(member.id, { name: values.name, teamId, fixedShiftId });
+      updateTeamMember(member.id, { name: values.name, email: values.email, teamId, fixedShiftId });
       toast({
         title: "Member Updated",
         description: `${values.name}'s details have been updated.`,
       });
     } else {
-      addTeamMember(values.name, teamId, fixedShiftId);
+      addTeamMember(values.name, values.email, teamId, fixedShiftId);
       toast({
         title: "Member Added",
         description: `${values.name} has been added to the team.`,
@@ -103,6 +105,19 @@ function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: 
                 <FormLabel>Full Name</FormLabel>
                 <FormControl>
                   <Input placeholder="e.g. John Doe" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+           <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Email</FormLabel>
+                <FormControl>
+                  <Input placeholder="e.g. john.doe@example.com" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -211,6 +226,7 @@ export function TeamManager() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Email</TableHead>
               <TableHead>Team</TableHead>
               <TableHead>Fixed Shift</TableHead>
               <TableHead className="text-right">Actions</TableHead>
@@ -220,6 +236,7 @@ export function TeamManager() {
             {teamMembers.map((member) => (
               <TableRow key={member.id}>
                 <TableCell className="font-medium">{member.name}</TableCell>
+                <TableCell>{member.email}</TableCell>
                 <TableCell>{member.teamId ? teamMap.get(member.teamId) : "None"}</TableCell>
                 <TableCell>{member.fixedShiftId ? shiftMap.get(member.fixedShiftId) : "None"}</TableCell>
                 <TableCell className="text-right">
@@ -262,7 +279,7 @@ export function TeamManager() {
             ))}
             {teamMembers.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground">
                         No members found.
                     </TableCell>
                 </TableRow>

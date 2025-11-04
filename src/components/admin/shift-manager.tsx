@@ -44,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "../ui/checkbox";
 import { Badge } from "../ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { useAccessControl } from "@/hooks/use-access-control";
 
 const shiftSchema = z.object({
   teamId: z.string().min(1, "A team must be selected."),
@@ -219,10 +220,17 @@ function ShiftForm({ shift, teamId, setOpen }: { shift?: Shift; teamId: string, 
 }
 
 export function ShiftManager() {
-  const { shifts, teams } = useRotaStore((state) => state);
+  const { shifts } = useRotaStore((state) => state);
   const { deleteShift } = useRotaStoreActions();
   const [openDialogs, setOpenDialogs] = React.useState<Record<string, boolean>>({});
-  const [selectedTeamId, setSelectedTeamId] = React.useState<string | undefined>(teams[0]?.id);
+  const { accessibleTeams } = useAccessControl();
+  const [selectedTeamId, setSelectedTeamId] = React.useState<string | undefined>(accessibleTeams[0]?.id);
+  
+  React.useEffect(() => {
+    if (accessibleTeams.length > 0 && !selectedTeamId) {
+        setSelectedTeamId(accessibleTeams[0].id);
+    }
+  }, [accessibleTeams, selectedTeamId]);
 
 
   const setOpen = (id: string, open: boolean) => {
@@ -248,7 +256,7 @@ export function ShiftManager() {
                 <SelectValue placeholder="Select a team" />
               </SelectTrigger>
               <SelectContent>
-                {teams.map(team => (
+                {accessibleTeams.map(team => (
                   <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
                 ))}
               </SelectContent>

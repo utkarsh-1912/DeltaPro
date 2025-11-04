@@ -41,29 +41,38 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import { useAccessControl } from "@/hooks/use-access-control";
 
 const teamSchema = z.object({
   name: z.string().min(2, "Team name must be at least 2 characters long."),
+  pmId: z.string().optional(),
 });
 
 function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => void }) {
   const { addTeam, updateTeam } = useRotaStoreActions();
+  const { teamMembers } = useRotaStore();
   const { toast } = useToast();
   const isEditMode = !!team;
+  
+  const projectManagers = React.useMemo(() => 
+    teamMembers.filter(m => m.email.endsWith('@pm.com') || m.email.endsWith('@admin.com'))
+  , [teamMembers]);
 
   const form = useForm<z.infer<typeof teamSchema>>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
       name: team?.name || "",
+      pmId: team?.pmId || "",
     },
   });
 
   function onSubmit(values: z.infer<typeof teamSchema>) {
     if (isEditMode && team) {
-      updateTeam(team.id, values.name);
+      updateTeam(team.id, values.name, values.pmId);
       toast({
         title: "Team Updated",
-        description: `The team has been renamed to ${values.name}.`,
+        description: `The team has been updated.`,
       });
     } else {
       addTeam(values.name);
@@ -82,7 +91,7 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
         <DialogHeader>
           <DialogTitle>{isEditMode ? "Edit Team" : "Add New Team"}</DialogTitle>
           <DialogDescription>
-            {isEditMode ? "Update the name for this team." : "Enter a name for the new team."}
+            {isEditMode ? "Update the details for this team." : "Enter a name for the new team."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -95,6 +104,29 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
                 <FormControl>
                   <Input placeholder="e.g. Frontend Developers" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="pmId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Project Manager</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Assign a Project Manager" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">No PM</SelectItem>
+                     {projectManagers.map(pm => (
+                      <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -112,10 +144,11 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
 }
 
 export function TeamsManager() {
-  const { teams, teamMembers } = useRotaStore(state => ({ teams: state.teams, teamMembers: state.teamMembers }));
+  const { teamMembers } = useRotaStore(state => ({ teamMembers: state.teamMembers }));
   const { deleteTeam } = useRotaStoreActions();
   const { toast } = useToast();
   const [dialogs, setDialogs] = React.useState<{ [key: string]: boolean }>({});
+  const { accessibleTeams } = useAccessControl();
 
   const setDialogOpen = (id: string, open: boolean) => {
     setDialogs(prev => ({ ...prev, [id]: open }));
@@ -132,14 +165,16 @@ export function TeamsManager() {
   
   const memberCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    teams.forEach(t => counts[t.id] = 0);
+    accessibleTeams.forEach(t => counts[t.id] = 0);
     teamMembers.forEach(m => {
         if(m.teamId && counts[m.teamId] !== undefined) {
             counts[m.teamId]++;
         }
     });
     return counts;
-  }, [teams, teamMembers]);
+  }, [accessibleTeams, teamMembers]);
+  
+  const pmMap = React.useMemo(() => new Map(teamMembers.map(m => [m.id, m.name])), [teamMembers]);
 
 
   return (
@@ -166,14 +201,16 @@ export function TeamsManager() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Members</TableHead>
+              <TableHead>Project Manager</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {teams.map((team) => (
+            {accessibleTeams.map((team) => (
               <TableRow key={team.id}>
                 <TableCell className="font-medium">{team.name}</TableCell>
                 <TableCell>{memberCounts[team.id] || 0}</TableCell>
+                <TableCell>{team.pmId ? pmMap.get(team.pmId) : "N/A"}</TableCell>
                 <TableCell className="text-right">
                   <Dialog open={dialogs[team.id]} onOpenChange={(open) => setDialogOpen(team.id, open)}>
                     <DialogTrigger asChild>
@@ -212,9 +249,9 @@ export function TeamsManager() {
                 </TableCell>
               </TableRow>
             ))}
-            {teams.length === 0 && (
+            {accessibleTeams.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
                         No teams found.
                     </TableCell>
                 </TableRow>
