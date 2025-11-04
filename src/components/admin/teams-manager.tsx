@@ -56,7 +56,7 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
   const isEditMode = !!team;
   
   const projectManagers = React.useMemo(() => 
-    teamMembers.filter(m => m.email.endsWith('@pm.com') || m.email.endsWith('@admin.com'))
+    teamMembers.filter(m => m.email && (m.email.endsWith('@pm.com') || m.email.endsWith('@admin.com')))
   , [teamMembers]);
 
   const form = useForm<z.infer<typeof teamSchema>>({
@@ -144,11 +144,10 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
 }
 
 export function TeamsManager() {
-  const { teamMembers } = useRotaStore(state => ({ teamMembers: state.teamMembers }));
+  const { teamMembers, teams } = useRotaStore(state => ({ teamMembers: state.teamMembers, teams: state.teams }));
   const { deleteTeam } = useRotaStoreActions();
   const { toast } = useToast();
   const [dialogs, setDialogs] = React.useState<{ [key: string]: boolean }>({});
-  const { accessibleTeams } = useAccessControl();
 
   const setDialogOpen = (id: string, open: boolean) => {
     setDialogs(prev => ({ ...prev, [id]: open }));
@@ -165,14 +164,14 @@ export function TeamsManager() {
   
   const memberCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
-    accessibleTeams.forEach(t => counts[t.id] = 0);
+    teams.forEach(t => counts[t.id] = 0);
     teamMembers.forEach(m => {
         if(m.teamId && counts[m.teamId] !== undefined) {
             counts[m.teamId]++;
         }
     });
     return counts;
-  }, [accessibleTeams, teamMembers]);
+  }, [teams, teamMembers]);
   
   const pmMap = React.useMemo(() => new Map(teamMembers.map(m => [m.id, m.name])), [teamMembers]);
 
@@ -206,7 +205,7 @@ export function TeamsManager() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {accessibleTeams.map((team) => (
+            {teams.map((team) => (
               <TableRow key={team.id}>
                 <TableCell className="font-medium">{team.name}</TableCell>
                 <TableCell>{memberCounts[team.id] || 0}</TableCell>
@@ -249,7 +248,7 @@ export function TeamsManager() {
                 </TableCell>
               </TableRow>
             ))}
-            {accessibleTeams.length === 0 && (
+            {teams.length === 0 && (
                 <TableRow>
                     <TableCell colSpan={4} className="text-center text-muted-foreground">
                         No teams found.
