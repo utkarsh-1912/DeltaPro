@@ -10,7 +10,6 @@ export function useAccessControl() {
   const { teams } = useRotaStore();
 
   const role = profile?.role || 'user';
-  const userId = profile?.id;
   
   const canAccessAdmin = useMemo(() => {
     return role === 'admin' || role === 'hr' || role === 'pm';
