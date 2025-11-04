@@ -3,7 +3,7 @@ export type UserRole = 'admin' | 'hr' | 'pm' | 'user';
 
 // ---CONFIGURATION---
 // Add email addresses to the appropriate roles.
-const ADMIN_EMAILS: string[] = ['admin@example.com', 'admin@rotapro.com'];
+const ADMIN_EMAILS: string[] = ['admin@example.com', 'admin@rotapro.com', 'admin@rota.pro'];
 const HR_EMAILS: string[] = ['hr@example.com', 'hr@rotapro.com'];
 const PM_EMAILS: string[] = ['pm@example.com', 'pm@rotapro.com'];
 // ---END CONFIGURATION---
