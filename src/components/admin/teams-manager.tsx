@@ -210,7 +210,7 @@ export function TeamsManager() {
               <TableRow key={team.id}>
                 <TableCell className="font-medium">{team.name}</TableCell>
                 <TableCell>{memberCounts[team.id] || 0}</TableCell>
-                <TableCell>{team.pmId ? pmMap.get(team.pmId) : "N/A"}</TableCell>
+                <TableCell>{(team.pmId && pmMap.get(team.pmId)) || "N/A"}</TableCell>
                 <TableCell className="text-right">
                   <Dialog open={dialogs[team.id]} onOpenChange={(open) => setDialogOpen(team.id, open)}>
                     <DialogTrigger asChild>
