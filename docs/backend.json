@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -22,13 +23,19 @@
         "isAdmin": {
           "type": "boolean",
           "description": "Indicates if the user has admin privileges."
+        },
+        "role": {
+          "type": "string",
+          "description": "The role of the user in the system.",
+          "enum": ["admin", "hr", "pm", "user"]
         }
       },
       "required": [
         "id",
         "email",
         "name",
-        "isAdmin"
+        "isAdmin",
+        "role"
       ]
     }
   },

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -28,6 +29,7 @@ import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase
 import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { getUserRole } from "@/lib/auth-roles";
 
 const signupSchema = z
   .object({
@@ -76,11 +78,14 @@ export default function SignupPage() {
 
       // Create user profile in Firestore
       const userDocRef = doc(firestore, "users", user.uid);
+      const userRole = getUserRole(values.email);
+
       await setDoc(userDocRef, {
         id: user.uid,
         email: user.email,
         name: values.name,
-        isAdmin: false, // Default to not admin
+        isAdmin: userRole === 'admin', // Keep for compatibility if needed, or remove
+        role: userRole,
       });
 
       toast({
