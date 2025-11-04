@@ -43,8 +43,10 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Checkbox } from "../ui/checkbox";
 import { Badge } from "../ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 
 const shiftSchema = z.object({
+  teamId: z.string().min(1, "A team must be selected."),
   name: z.string().min(1, "Shift name is required"),
   startTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:mm)"),
   endTime: z.string().regex(/^([01]\d|2[0-3]):([0-5]\d)$/, "Invalid time format (HH:mm)"),
@@ -57,9 +59,8 @@ const shiftSchema = z.object({
     path: ["maxTeam"],
 });
 
-function ShiftForm({ shift, setOpen }: { shift?: Shift; setOpen: (open: boolean) => void }) {
+function ShiftForm({ shift, teamId, setOpen }: { shift?: Shift; teamId: string, setOpen: (open: boolean) => void }) {
     const { addShift, updateShift } = useRotaStoreActions();
-    const teamMembers = useRotaStore((state) => state.teamMembers);
     const { toast } = useToast();
     const isEditMode = !!shift;
 
@@ -68,25 +69,27 @@ function ShiftForm({ shift, setOpen }: { shift?: Shift; setOpen: (open: boolean)
         defaultValues: isEditMode ? {
             ...shift,
         } : {
+            teamId,
             name: "",
             startTime: "09:00",
             endTime: "17:00",
             sequence: 1,
             isExtreme: false,
             minTeam: 1,
-            maxTeam: Math.max(1, teamMembers.length),
+            maxTeam: 1,
         },
     });
 
     function onSubmit(values: z.infer<typeof shiftSchema>) {
+        const shiftData = { ...values };
         if (isEditMode) {
-            updateShift(shift.id, values);
+            updateShift(shift.id, shiftData);
             toast({
                 title: "Shift Updated",
                 description: `The ${values.name} shift has been updated.`,
             });
         } else {
-            addShift(values);
+            addShift(shiftData);
             toast({
                 title: "Shift Added",
                 description: `The ${values.name} shift has been added.`,
@@ -216,15 +219,19 @@ function ShiftForm({ shift, setOpen }: { shift?: Shift; setOpen: (open: boolean)
 }
 
 export function ShiftManager() {
-  const shifts = useRotaStore((state) => state.shifts);
+  const { shifts, teams } = useRotaStore((state) => state);
   const { deleteShift } = useRotaStoreActions();
   const [openDialogs, setOpenDialogs] = React.useState<Record<string, boolean>>({});
+  const [selectedTeamId, setSelectedTeamId] = React.useState<string | undefined>(teams[0]?.id);
+
 
   const setOpen = (id: string, open: boolean) => {
     setOpenDialogs(prev => ({ ...prev, [id]: open }));
   };
   
-  const sortedShifts = React.useMemo(() => [...shifts].sort((a,b) => a.sequence - b.sequence), [shifts]);
+  const shiftsForTeam = React.useMemo(() => 
+    shifts.filter(s => s.teamId === selectedTeamId).sort((a,b) => a.sequence - b.sequence),
+  [shifts, selectedTeamId]);
 
   return (
     <Card>
@@ -232,17 +239,29 @@ export function ShiftManager() {
         <div>
             <CardTitle>Shift Management</CardTitle>
             <CardDescription>
-            View, edit, and create the available shifts and their properties.
+            Define shifts for each team, including times and staffing needs.
             </CardDescription>
         </div>
-         <Dialog open={openDialogs['new-shift'] || false} onOpenChange={(isOpen) => setOpen('new-shift', isOpen)}>
-            <DialogTrigger asChild>
-                <Button><Plus /> Add Shift</Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-                <ShiftForm setOpen={(isOpen) => setOpen('new-shift', isOpen)} />
-            </DialogContent>
-        </Dialog>
+        <div className="flex items-center gap-2">
+            <Select value={selectedTeamId} onValueChange={setSelectedTeamId}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="Select a team" />
+              </SelectTrigger>
+              <SelectContent>
+                {teams.map(team => (
+                  <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Dialog open={openDialogs['new-shift'] || false} onOpenChange={(isOpen) => setOpen('new-shift', isOpen)}>
+                <DialogTrigger asChild>
+                    <Button disabled={!selectedTeamId}><Plus /> Add Shift</Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                    <ShiftForm teamId={selectedTeamId!} setOpen={(isOpen) => setOpen('new-shift', isOpen)} />
+                </DialogContent>
+            </Dialog>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
@@ -257,7 +276,7 @@ export function ShiftManager() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {sortedShifts.map((shift) => (
+            {selectedTeamId ? shiftsForTeam.map((shift) => (
               <TableRow key={shift.id}>
                 <TableCell className="font-mono">{shift.sequence}</TableCell>
                 <TableCell className="font-medium">{shift.name}</TableCell>
@@ -275,7 +294,7 @@ export function ShiftManager() {
                       </Button>
                     </DialogTrigger>
                     <DialogContent className="max-w-md">
-                      <ShiftForm shift={shift} setOpen={(isOpen) => setOpen(shift.id, isOpen)} />
+                      <ShiftForm shift={shift} teamId={selectedTeamId} setOpen={(isOpen) => setOpen(shift.id, isOpen)} />
                     </DialogContent>
                   </Dialog>
                   <AlertDialog>
@@ -302,11 +321,17 @@ export function ShiftManager() {
                   </AlertDialog>
                 </TableCell>
               </TableRow>
-            ))}
-             {shifts.length === 0 && (
+            )) : (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                    Please select a team to manage its shifts.
+                </TableCell>
+              </TableRow>
+            )}
+             {selectedTeamId && shiftsForTeam.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={6} className="text-center text-muted-foreground">
-                        No shifts defined.
+                    <TableCell colSpan={6} className="text-center text-muted-foreground h-24">
+                        No shifts defined for this team.
                     </TableCell>
                 </TableRow>
             )}

@@ -19,12 +19,7 @@ const getInitialState = (): Omit<AppState, keyof ReturnType<typeof useRotaStoreA
     return {
         teamMembers: [],
         teams: [],
-        shifts: [
-          { id: 'apac', name: 'APAC', startTime: '04:00', endTime: '14:00', color: 'var(--chart-1)', sequence: 1, isExtreme: true, minTeam: 1, maxTeam: 10 },
-          { id: 'emea', name: 'EMEA', startTime: '13:00', endTime: '23:00', color: 'var(--chart-2)', sequence: 4, isExtreme: false, minTeam: 1, maxTeam: 10 },
-          { id: 'us', name: 'US', startTime: '18:00', endTime: '04:00', color: 'var(--chart-3)', sequence: 3, isExtreme: true, minTeam: 1, maxTeam: 10 },
-          { id: 'late_emea', name: 'LATE EMEA', startTime: '15:00', endTime: '01:00', color: 'var(--chart-4)', sequence: 2, isExtreme: false, minTeam: 1, maxTeam: 10 }
-        ],
+        shifts: [],
         leave: [],
         generationHistory: [],
         activeGenerationId: null,
@@ -149,7 +144,9 @@ export const useRotaStore = create<AppState>()(
           // Also unassign members from the deleted team
           teamMembers: state.teamMembers.map(member => 
               member.teamId === id ? { ...member, teamId: undefined } : member
-          )
+          ),
+          // Also delete shifts associated with the team
+          shifts: state.shifts.filter(shift => shift.teamId !== id),
       })),
 
       addShift: (newShiftData) =>
@@ -157,7 +154,7 @@ export const useRotaStore = create<AppState>()(
           const newShift: Shift = {
             id: new Date().getTime().toString(),
             ...newShiftData,
-            color: SHIFT_COLORS[state.shifts.length % SHIFT_COLORS.length],
+            color: SHIFT_COLORS[state.shifts.filter(s => s.teamId === newShiftData.teamId).length % SHIFT_COLORS.length],
           };
           return {
             shifts: [...state.shifts, newShift],
@@ -291,7 +288,17 @@ export const useRotaStore = create<AppState>()(
               return state;
             }
 
-            const sortedShifts = [...shifts].sort((a,b) => a.sequence - b.sequence);
+            const shiftsForTeam = shifts.filter(s => s.teamId === teamId);
+            if (shiftsForTeam.length === 0) {
+                 toast({
+                  variant: "destructive",
+                  title: "Generation Failed",
+                  description: "The selected team has no shifts defined.",
+              });
+              return state;
+            }
+
+            const sortedShifts = [...shiftsForTeam].sort((a,b) => a.sequence - b.sequence);
             const newStartDate = startOfWeek(startDate, { weekStartsOn: 1 });
             const periodInDays = rotaPeriodInWeeks * 7;
             const newEndDate = addDays(newStartDate, periodInDays - 1);

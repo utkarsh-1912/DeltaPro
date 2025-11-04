@@ -24,6 +24,7 @@ export interface Shift {
   isExtreme: boolean;
   minTeam: number;
   maxTeam: number;
+  teamId: string; // Each shift belongs to a team
 }
 
 // Assignments map a team member's ID to a shift ID
@@ -60,7 +61,7 @@ export interface RotaGeneration {
   startDate: string; // ISO string for the start of this period
   endDate: string; // ISO string for the end of this period
   assignments: RotaAssignments;
-  teamId?: string; // The team this rota was generated for
+  teamId: string; // The team this rota was generated for
   teamMembersAtGeneration?: TeamMember[]; // Snapshot of team members
   manualOverrides?: string[]; // Array of member IDs that have been manually changed
   manualSwaps?: ManualSwap[]; // Array of swaps that occurred
