@@ -1,5 +1,11 @@
 
-import type { User } from "firebase/auth";
+import type { User as AuthUser } from "firebase/auth";
+
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+}
 
 export interface Team {
   id: string;
@@ -82,6 +88,7 @@ export type WeekendRota = {
 export type ShiftStreak = Record<string, { shiftId: string | null; count: number }>;
 
 export interface AppState {
+  users: User[];
   teamMembers: TeamMember[];
   teams: Team[];
   shifts: Shift[];
@@ -91,6 +98,7 @@ export interface AppState {
   weekendRotas: WeekendRota[];
   lastWeekendAssigneeIndex: number;
   showExportFooter: boolean;
+  addUser: (user: User) => void;
   addTeamMember: (name: string, email: string, teamId?: string, fixedShiftId?: string) => void;
   updateTeamMember: (id: string, updates: Partial<Pick<TeamMember, 'name' | 'email' | 'teamId' | 'fixedShiftId'>>) => void;
   deleteTeamMember: (id: string) => void;
@@ -126,10 +134,10 @@ export type UserProfile = {
 };
 
 export interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   profile: UserProfile | null;
   loading: boolean;
-  setUser: (user: User | null) => void;
+  setUser: (user: AuthUser | null) => void;
   setProfile: (profile: UserProfile | null) => void;
   setLoading: (loading: boolean) => void;
 }

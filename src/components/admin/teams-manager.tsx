@@ -6,7 +6,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useRotaStore, useRotaStoreActions } from "@/lib/store";
-import type { Team } from "@/lib/types";
+import type { Team, User } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -51,18 +51,18 @@ const teamSchema = z.object({
 });
 
 function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => void }) {
-  const { addTeam, updateTeam } = useRotaStoreActions();
-  const { teamMembers } = useRotaStore();
+  const { updateTeam, addTeam } = useRotaStoreActions();
+  const { users } = useRotaStore();
   const { toast } = useToast();
   const isEditMode = !!team;
   
   const projectManagers = React.useMemo(() => 
-    teamMembers.filter(m => {
-        if (!m.email) return false;
-        const role = getUserRole(m.email);
+    users.filter(u => {
+        if (!u.email) return false;
+        const role = getUserRole(u.email);
         return role === 'pm' || role === 'admin';
     })
-  , [teamMembers]);
+  , [users]);
 
   const form = useForm<z.infer<typeof teamSchema>>({
     resolver: zodResolver(teamSchema),
@@ -149,7 +149,7 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
 }
 
 export function TeamsManager() {
-  const { teamMembers, teams } = useRotaStore(state => ({ teamMembers: state.teamMembers, teams: state.teams }));
+  const { users, teamMembers, teams } = useRotaStore(state => ({ users: state.users, teamMembers: state.teamMembers, teams: state.teams }));
   const { deleteTeam } = useRotaStoreActions();
   const { toast } = useToast();
   const [dialogs, setDialogs] = React.useState<{ [key: string]: boolean }>({});
@@ -178,7 +178,7 @@ export function TeamsManager() {
     return counts;
   }, [teams, teamMembers]);
   
-  const pmMap = React.useMemo(() => new Map(teamMembers.map(m => [m.id, m.name])), [teamMembers]);
+  const pmMap = React.useMemo(() => new Map(users.map(u => [u.id, u.name])), [users]);
 
 
   return (

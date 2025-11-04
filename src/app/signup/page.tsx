@@ -30,6 +30,7 @@ import { getFirestore, doc, setDoc } from "firebase/firestore";
 import { FirebaseError } from "firebase/app";
 import { ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { getUserRole } from "@/lib/auth-roles";
+import { useRotaStoreActions } from "@/lib/store";
 
 const signupSchema = z
   .object({
@@ -49,6 +50,7 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const { addUser } = useRotaStoreActions();
 
   const form = useForm<z.infer<typeof signupSchema>>({
     resolver: zodResolver(signupSchema),
@@ -87,6 +89,9 @@ export default function SignupPage() {
         isAdmin: userRole === 'admin', // Keep for compatibility if needed, or remove
         role: userRole,
       });
+      
+      // Also add to the global users list in the store
+      addUser({ id: user.uid, name: values.name, email: values.email! });
 
       toast({
         title: "Account Created",

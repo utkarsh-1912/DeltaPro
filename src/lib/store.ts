@@ -1,9 +1,7 @@
 
-
-
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave, Team } from "./types";
+import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave, Team, User } from "./types";
 import { startOfWeek, formatISO, parseISO, addDays, eachWeekendOfInterval, isWithinInterval, format, isSaturday } from "date-fns";
 import { generateNewRotaAssignments, balanceAssignments } from "./rotaGenerator";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +16,7 @@ const SHIFT_COLORS = [
 
 const getInitialState = (): Omit<AppState, keyof ReturnType<typeof useRotaStoreActions>> => {
     return {
+        users: [],
         teamMembers: [],
         teams: [],
         shifts: [],
@@ -111,6 +110,13 @@ export const useRotaStore = create<AppState>()(
   persist(
     (set, get) => ({
       ...getInitialState(),
+      
+      addUser: (user) => set((state) => {
+        if (state.users.some(u => u.id === user.id)) {
+            return state;
+        }
+        return { users: [...state.users, user] };
+      }),
 
       addTeamMember: (name, email, teamId, fixedShiftId) =>
         set((state) => ({
@@ -552,6 +558,7 @@ export const useRotaStore = create<AppState>()(
 );
 
 export const useRotaStoreActions = () => useRotaStore(state => ({
+    addUser: state.addUser,
     addTeamMember: state.addTeamMember,
     updateTeamMember: state.updateTeamMember,
     deleteTeamMember: state.deleteTeamMember,
