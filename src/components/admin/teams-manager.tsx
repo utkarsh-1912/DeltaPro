@@ -43,6 +43,7 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useAccessControl } from "@/hooks/use-access-control";
+import { getUserRole } from "@/lib/auth-roles";
 
 const teamSchema = z.object({
   name: z.string().min(2, "Team name must be at least 2 characters long."),
@@ -56,7 +57,11 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
   const isEditMode = !!team;
   
   const projectManagers = React.useMemo(() => 
-    teamMembers.filter(m => m.email && (m.email.endsWith('@pm.com') || m.email.endsWith('@admin.com')))
+    teamMembers.filter(m => {
+        if (!m.email) return false;
+        const role = getUserRole(m.email);
+        return role === 'pm' || role === 'admin';
+    })
   , [teamMembers]);
 
   const form = useForm<z.infer<typeof teamSchema>>({

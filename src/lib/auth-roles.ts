@@ -13,7 +13,10 @@ const PM_EMAILS: string[] = ['pm@example.com', 'pm@rotapro.com'];
  * @param email The user's email address.
  * @returns The determined UserRole.
  */
-export function getUserRole(email: string): UserRole {
+export function getUserRole(email: string | undefined | null): UserRole {
+  if (!email) {
+    return 'user';
+  }
   const normalizedEmail = email.toLowerCase();
 
   if (ADMIN_EMAILS.includes(normalizedEmail)) {
@@ -25,5 +28,10 @@ export function getUserRole(email: string): UserRole {
   if (PM_EMAILS.includes(normalizedEmail)) {
     return 'pm';
   }
+  
+  if (normalizedEmail.endsWith('@pm.com') || normalizedEmail.endsWith('@admin.com')) {
+      return 'pm';
+  }
+
   return 'user';
 }
