@@ -20,15 +20,11 @@ export function useAccessControl() {
     if (role === 'admin' || role === 'hr') {
       return teams;
     }
-    if (role === 'pm') {
-      // Find all members with the current user's email, as a user could be a "member" multiple times in different teams
-      // but their login is the same. We need their "member id" from the teamMembers list.
-      const pmAsMember = useRotaStore.getState().teamMembers.find(m => m.email === profile?.email);
-      if (!pmAsMember) return [];
-      return teams.filter(team => team.pmId === pmAsMember.id);
+    if (role === 'pm' && profile?.id) {
+       return teams.filter(team => team.pmId === profile.id);
     }
     return [];
-  }, [role, teams, userId, profile?.email]);
+  }, [role, teams, profile?.id]);
 
   return { role, canAccessAdmin, accessibleTeams };
 }
