@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave } from "./types";
+import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave, Team } from "./types";
 import { startOfWeek, formatISO, parseISO, addDays, eachWeekendOfInterval, isWithinInterval, format, isSaturday } from "date-fns";
 import { generateNewRotaAssignments, balanceAssignments } from "./rotaGenerator";
 import { toast } from "@/hooks/use-toast";
@@ -18,6 +18,7 @@ const SHIFT_COLORS = [
 const getInitialState = (): Omit<AppState, keyof ReturnType<typeof useRotaStoreActions>> => {
     return {
         teamMembers: [],
+        teams: [],
         shifts: [
           { id: 'apac', name: 'APAC', startTime: '04:00', endTime: '14:00', color: 'var(--chart-1)', sequence: 1, isExtreme: true, minTeam: 1, maxTeam: 10 },
           { id: 'emea', name: 'EMEA', startTime: '13:00', endTime: '23:00', color: 'var(--chart-2)', sequence: 4, isExtreme: false, minTeam: 1, maxTeam: 10 },
@@ -115,11 +116,11 @@ export const useRotaStore = create<AppState>()(
     (set, get) => ({
       ...getInitialState(),
 
-      addTeamMember: (name, fixedShiftId) =>
+      addTeamMember: (name, teamId, fixedShiftId) =>
         set((state) => ({
           teamMembers: [
             ...state.teamMembers,
-            { id: new Date().getTime().toString(), name, fixedShiftId },
+            { id: new Date().getTime().toString(), name, teamId, fixedShiftId },
           ],
         })),
 
@@ -135,6 +136,22 @@ export const useRotaStore = create<AppState>()(
           teamMembers: state.teamMembers.filter((member) => member.id !== id),
         })),
       
+      addTeam: (name) => set(state => ({
+          teams: [...state.teams, { id: new Date().getTime().toString(), name }]
+      })),
+
+      updateTeam: (id, name) => set(state => ({
+          teams: state.teams.map(team => team.id === id ? { ...team, name } : team)
+      })),
+      
+      deleteTeam: (id) => set(state => ({
+          teams: state.teams.filter(team => team.id !== id),
+          // Also unassign members from the deleted team
+          teamMembers: state.teamMembers.map(member => 
+              member.teamId === id ? { ...member, teamId: undefined } : member
+          )
+      })),
+
       addShift: (newShiftData) =>
         set((state) => {
           const newShift: Shift = {
@@ -260,22 +277,33 @@ export const useRotaStore = create<AppState>()(
         return { generationHistory: newHistory };
       }),
 
-      generateNewRota: (startDate: Date, rotaPeriodInWeeks: number = 2) => {
+      generateNewRota: (startDate: Date, rotaPeriodInWeeks: number = 2, teamId: string) => {
         set(state => {
             const { teamMembers, shifts, generationHistory, leave, lastWeekendAssigneeIndex } = state;
+            
+            const membersInTeam = teamMembers.filter(m => m.teamId === teamId);
+            if (membersInTeam.length === 0) {
+              toast({
+                  variant: "destructive",
+                  title: "Generation Failed",
+                  description: "The selected team has no members.",
+              });
+              return state;
+            }
+
             const sortedShifts = [...shifts].sort((a,b) => a.sequence - b.sequence);
             const newStartDate = startOfWeek(startDate, { weekStartsOn: 1 });
             const periodInDays = rotaPeriodInWeeks * 7;
             const newEndDate = addDays(newStartDate, periodInDays - 1);
             
-            const membersOnLeave = teamMembers.filter(member => 
+            const membersOnLeave = membersInTeam.filter(member => 
                 leave.some(l => 
                     l.memberId === member.id &&
                     isWithinInterval(newStartDate, { start: parseISO(l.startDate), end: parseISO(l.endDate) })
                 )
             );
             
-            const availableMembers = teamMembers.filter(m => !membersOnLeave.some(leaveMember => leaveMember.id === m.id));
+            const availableMembers = membersInTeam.filter(m => !membersOnLeave.some(leaveMember => leaveMember.id === m.id));
 
             const totalMinRequired = sortedShifts.reduce((acc, s) => acc + s.minTeam, 0);
             const flexibleMemberCount = availableMembers.filter(m => !m.fixedShiftId).length;
@@ -311,8 +339,9 @@ export const useRotaStore = create<AppState>()(
                 id: new Date().getTime().toString(),
                 startDate: formatISO(newStartDate),
                 endDate: formatISO(newEndDate),
+                teamId: teamId,
                 assignments: finalAssignments,
-                teamMembersAtGeneration: [...teamMembers],
+                teamMembersAtGeneration: [...membersInTeam],
                 manualOverrides: [],
                 manualSwaps: [],
                 manualWeekendSwaps: [],
@@ -322,7 +351,7 @@ export const useRotaStore = create<AppState>()(
             // Auto-generate weekend rota for the new generation
             const { newRotas: newWeekendRotas, nextIndex: newLastWeekendIndex } = generateWeekendRotaForGeneration(
                 newGeneration,
-                teamMembers,
+                membersInTeam,
                 lastWeekendAssigneeIndex
             );
 
@@ -518,6 +547,9 @@ export const useRotaStoreActions = () => useRotaStore(state => ({
     addTeamMember: state.addTeamMember,
     updateTeamMember: state.updateTeamMember,
     deleteTeamMember: state.deleteTeamMember,
+    addTeam: state.addTeam,
+    updateTeam: state.updateTeam,
+    deleteTeam: state.deleteTeam,
     addShift: state.addShift,
     updateShift: state.updateShift,
     deleteShift: state.deleteShift,

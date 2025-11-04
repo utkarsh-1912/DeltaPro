@@ -1,9 +1,15 @@
 
 import type { User } from "firebase/auth";
 
+export interface Team {
+  id: string;
+  name: string;
+}
+
 export interface TeamMember {
   id: string;
   name: string;
+  teamId?: string;
   fixedShiftId?: string;
   lastShiftId?: string;
 }
@@ -54,6 +60,7 @@ export interface RotaGeneration {
   startDate: string; // ISO string for the start of this period
   endDate: string; // ISO string for the end of this period
   assignments: RotaAssignments;
+  teamId?: string; // The team this rota was generated for
   teamMembersAtGeneration?: TeamMember[]; // Snapshot of team members
   manualOverrides?: string[]; // Array of member IDs that have been manually changed
   manualSwaps?: ManualSwap[]; // Array of swaps that occurred
@@ -73,6 +80,7 @@ export type ShiftStreak = Record<string, { shiftId: string | null; count: number
 
 export interface AppState {
   teamMembers: TeamMember[];
+  teams: Team[];
   shifts: Shift[];
   leave: Leave[];
   generationHistory: RotaGeneration[];
@@ -80,16 +88,19 @@ export interface AppState {
   weekendRotas: WeekendRota[];
   lastWeekendAssigneeIndex: number;
   showExportFooter: boolean;
-  addTeamMember: (name: string, fixedShiftId?: string) => void;
-  updateTeamMember: (id: string, updates: Partial<Pick<TeamMember, 'name' | 'fixedShiftId'>>) => void;
+  addTeamMember: (name: string, teamId?: string, fixedShiftId?: string) => void;
+  updateTeamMember: (id: string, updates: Partial<Pick<TeamMember, 'name' | 'teamId' | 'fixedShiftId'>>) => void;
   deleteTeamMember: (id: string) => void;
+  addTeam: (name: string) => void;
+  updateTeam: (id: string, name: string) => void;
+  deleteTeam: (id: string) => void;
   addShift: (newShift: Omit<Shift, 'id' | 'color'>) => void;
   updateShift: (id: string, newShift: Partial<Omit<Shift, 'id' | 'color'>>) => void;
   deleteShift: (id: string) => void;
   addLeave: (leave: Omit<Leave, 'id'>) => void;
   deleteLeave: (leaveId: string) => void;
   updateAssignmentsForGeneration: (generationId: string, assignments: RotaAssignments, comments: Record<string, string>) => void;
-  generateNewRota: (startDate: Date, rotaPeriodInWeeks: number) => void;
+  generateNewRota: (startDate: Date, rotaPeriodInWeeks: number, teamId: string) => void;
   swapShifts: (memberId1: string, memberId2: string, generationId?: string) => void;
   toggleSwapNeutralization: (generationId: string, memberId1: string, memberId2: string) => void;
   deleteGeneration: (generationId: string) => void;

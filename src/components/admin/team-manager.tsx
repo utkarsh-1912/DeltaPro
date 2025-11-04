@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from "react";
@@ -44,12 +45,13 @@ import { useToast } from "@/hooks/use-toast";
 
 const memberSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters long."),
+  teamId: z.string().optional(),
   fixedShiftId: z.string().optional(),
 });
 
 function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: boolean) => void }) {
   const { addTeamMember, updateTeamMember } = useRotaStoreActions();
-  const shifts = useRotaStore(state => state.shifts);
+  const { shifts, teams } = useRotaStore(state => ({ shifts: state.shifts, teams: state.teams }));
   const { toast } = useToast();
   const isEditMode = !!member;
 
@@ -57,20 +59,23 @@ function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: 
     resolver: zodResolver(memberSchema),
     defaultValues: {
       name: member?.name || "",
+      teamId: member?.teamId || "",
       fixedShiftId: member?.fixedShiftId || "",
     },
   });
 
   function onSubmit(values: z.infer<typeof memberSchema>) {
+    const teamId = values.teamId === "none" ? undefined : values.teamId;
     const fixedShiftId = values.fixedShiftId === "none" ? undefined : values.fixedShiftId;
+
     if (isEditMode && member) {
-      updateTeamMember(member.id, { name: values.name, fixedShiftId });
+      updateTeamMember(member.id, { name: values.name, teamId, fixedShiftId });
       toast({
         title: "Member Updated",
         description: `${values.name}'s details have been updated.`,
       });
     } else {
-      addTeamMember(values.name, fixedShiftId);
+      addTeamMember(values.name, teamId, fixedShiftId);
       toast({
         title: "Member Added",
         description: `${values.name} has been added to the team.`,
@@ -84,9 +89,9 @@ function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: 
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <DialogHeader>
-          <DialogTitle>{isEditMode ? "Edit Team Member" : "Add New Team Member"}</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit Member" : "Add New Member"}</DialogTitle>
           <DialogDescription>
-            {isEditMode ? "Update the details for this team member." : "Enter the details for the new team member."}
+            {isEditMode ? "Update the details for this member." : "Enter the details for the new member."}
           </DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
@@ -99,6 +104,29 @@ function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: 
                 <FormControl>
                   <Input placeholder="e.g. John Doe" {...field} />
                 </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="teamId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Team</FormLabel>
+                 <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Assign to a team" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    <SelectItem value="none">No team</SelectItem>
+                    {teams.map(team => (
+                      <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
                 <FormMessage />
               </FormItem>
             )}
@@ -139,8 +167,7 @@ function MemberForm({ member, setOpen }: { member?: TeamMember; setOpen: (open: 
 }
 
 export function TeamManager() {
-  const teamMembers = useRotaStore((state) => state.teamMembers);
-  const shifts = useRotaStore(state => state.shifts);
+  const { teamMembers, shifts, teams } = useRotaStore(state => state);
   const { deleteTeamMember } = useRotaStoreActions();
   const { toast } = useToast();
   const [dialogs, setDialogs] = React.useState<{[key: string]: boolean}>({});
@@ -154,19 +181,20 @@ export function TeamManager() {
     toast({
       variant: "destructive",
       title: "Member Deleted",
-      description: `${member.name} has been removed from the team.`,
+      description: `${member.name} has been removed.`,
     });
   };
 
   const shiftMap = new Map(shifts.map(s => [s.id, s.name]));
+  const teamMap = new Map(teams.map(t => [t.id, t.name]));
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
-          <CardTitle>Team Management</CardTitle>
+          <CardTitle>Member Management</CardTitle>
           <CardDescription>
-            Add, edit, or remove members from your team.
+            Add, edit, or remove members and assign them to teams.
           </CardDescription>
         </div>
         <Dialog open={dialogs['new']} onOpenChange={(open) => setDialogOpen('new', open)}>
@@ -183,6 +211,7 @@ export function TeamManager() {
           <TableHeader>
             <TableRow>
               <TableHead>Name</TableHead>
+              <TableHead>Team</TableHead>
               <TableHead>Fixed Shift</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -191,6 +220,7 @@ export function TeamManager() {
             {teamMembers.map((member) => (
               <TableRow key={member.id}>
                 <TableCell className="font-medium">{member.name}</TableCell>
+                <TableCell>{member.teamId ? teamMap.get(member.teamId) : "None"}</TableCell>
                 <TableCell>{member.fixedShiftId ? shiftMap.get(member.fixedShiftId) : "None"}</TableCell>
                 <TableCell className="text-right">
                   <Dialog open={dialogs[member.id]} onOpenChange={(open) => setDialogOpen(member.id, open)}>
@@ -232,8 +262,8 @@ export function TeamManager() {
             ))}
             {teamMembers.length === 0 && (
                 <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground">
-                        No team members found.
+                    <TableCell colSpan={4} className="text-center text-muted-foreground">
+                        No members found.
                     </TableCell>
                 </TableRow>
             )}
