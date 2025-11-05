@@ -80,7 +80,7 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
         description: `The team has been updated.`,
       });
     } else {
-      addTeam(values.name);
+      addTeam(values.name, values.pmId);
       toast({
         title: "Team Added",
         description: `The ${values.name} team has been created.`,

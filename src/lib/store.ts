@@ -138,8 +138,8 @@ export const useRotaStore = create<AppState>()(
           teamMembers: state.teamMembers.filter((member) => member.id !== id),
         })),
       
-      addTeam: (name) => set(state => ({
-          teams: [...state.teams, { id: new Date().getTime().toString(), name }]
+      addTeam: (name, pmId) => set(state => ({
+          teams: [...state.teams, { id: new Date().getTime().toString(), name, pmId: pmId === "none" ? undefined : pmId }]
       })),
 
       updateTeam: (id, name, pmId) => set(state => ({
