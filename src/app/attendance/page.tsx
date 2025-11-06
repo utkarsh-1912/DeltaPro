@@ -11,10 +11,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, CalendarClock, Clock } from "lucide-react";
+import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, CalendarClock, Clock, UserCheck, Plane, Coffee } from "lucide-react";
 import { getDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, isToday, endOfDay, intervalToDuration, formatDuration } from "date-fns";
+import { format, parseISO, isToday, endOfDay, intervalToDuration, formatDuration, isWithinInterval } from "date-fns";
 import type { AttendanceLog } from "@/lib/types";
 
 type GeolocationState = {
@@ -71,7 +71,7 @@ function calculateTotalDurationForDay(logs: AttendanceLog[]): string {
 
 export default function AttendancePage() {
     const { user } = useAuthStore();
-    const { geolocation: geoConfig, attendance, activeGenerationId, generationHistory, shifts } = useRotaStore();
+    const { geolocation: geoConfig, attendance, activeGenerationId, generationHistory, shifts, leave } = useRotaStore();
     const { logAttendance } = useRotaStoreActions();
     const { toast } = useToast();
 
@@ -93,6 +93,15 @@ export default function AttendancePage() {
         const shiftId = activeGeneration.assignments[user.uid];
         return shiftId ? shiftMap.get(shiftId) : null;
     }, [user, activeGeneration, shiftMap]);
+
+    const isUserOnLeaveToday = React.useMemo(() => {
+        if (!user) return false;
+        const today = new Date();
+        return leave.some(l => 
+            l.memberId === user.uid && 
+            isWithinInterval(today, { start: parseISO(l.startDate), end: parseISO(l.endDate) })
+        );
+    }, [user, leave]);
 
     const activeLog = attendance.find(log => log.userId === user?.uid && !log.logoutTime);
     
@@ -124,7 +133,7 @@ export default function AttendancePage() {
 
     const isInRange = distance !== null && distance <= geoConfig.radius;
 
-    const canClockIn = !activeLog && !isStaleSession;
+    const canClockIn = !activeLog && !isStaleSession && !isUserOnLeaveToday;
     const canClockOut = !!activeLog && !isStaleSession;
 
     useEffect(() => {
@@ -144,10 +153,10 @@ export default function AttendancePage() {
                 );
                 const isNowInRange = currentDistance <= geoConfig.radius;
 
-                const currentActiveLog = get().attendance.find(log => log.userId === get().user?.uid && !log.logoutTime);
+                const currentActiveLog = useRotaStore.getState().attendance.find(log => log.userId === useAuthStore.getState().user?.uid && !log.logoutTime);
 
                 if (currentActiveLog && !currentActiveLog.isWfh && !isNowInRange) {
-                    logAttendance(get().user!.uid, undefined, false);
+                    logAttendance(useAuthStore.getState().user!.uid, undefined, false);
                     toast({
                         variant: "destructive",
                         title: "Auto Clock-Out",
@@ -203,7 +212,7 @@ export default function AttendancePage() {
         >
             <Card>
                 <CardHeader>
-                    <CardTitle>Attendance</CardTitle>
+                    <CardTitle className="flex items-center gap-2"><UserCheck />Attendance</CardTitle>
                     <CardDescription>Clock in or out for your shift. Your status is automatically determined by your location relative to the office.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -274,10 +283,15 @@ export default function AttendancePage() {
                                                 </Badge>
                                                 <p className="text-lg font-mono">{currentShift.startTime} - {currentShift.endTime}</p>
                                            </>
+                                       ) : isUserOnLeaveToday ? (
+                                            <div className="flex flex-col items-center text-muted-foreground">
+                                                <Plane className="h-8 w-8 mb-2" />
+                                                <p className="font-semibold">On Leave</p>
+                                            </div>
                                        ) : (
                                             <div className="flex flex-col items-center text-muted-foreground">
-                                                <CalendarClock className="h-8 w-8 mb-2" />
-                                                <p>No shift assigned today.</p>
+                                                <Coffee className="h-8 w-8 mb-2" />
+                                                <p className="font-semibold">Offline</p>
                                             </div>
                                        )}
                                    </CardContent>
@@ -361,5 +375,3 @@ export default function AttendancePage() {
         </motion.div>
     );
 }
-
-    
