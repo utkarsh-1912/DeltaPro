@@ -1,7 +1,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave, Team, User } from "./types";
+import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave, Team, User, GeolocationConfig } from "./types";
 import { startOfWeek, formatISO, parseISO, addDays, eachWeekendOfInterval, isWithinInterval, format, isSaturday } from "date-fns";
 import { generateNewRotaAssignments, balanceAssignments } from "./rotaGenerator";
 import { toast } from "@/hooks/use-toast";
@@ -26,6 +26,12 @@ const getInitialState = (): Omit<AppState, keyof ReturnType<typeof useRotaStoreA
         weekendRotas: [],
         lastWeekendAssigneeIndex: -1,
         showExportFooter: true,
+        attendance: [],
+        geolocation: {
+            officeLatitude: 51.5074, // Default to London
+            officeLongitude: -0.1278,
+            radius: 50, // 50 meters
+        },
     }
 }
 
@@ -525,6 +531,31 @@ export const useRotaStore = create<AppState>()(
         showExportFooter: !state.showExportFooter
       })),
 
+      logAttendance: (userId, location) => set(state => {
+        const now = new Date().toISOString();
+        const activeLog = state.attendance.find(log => log.userId === userId && !log.logoutTime);
+        if (activeLog) {
+            // Clock out
+            const updatedLog = { ...activeLog, logoutTime: now, logoutLocation: location };
+            toast({ title: 'Clocked Out', description: 'Your attendance has been logged.' });
+            return { attendance: state.attendance.map(log => log.id === activeLog.id ? updatedLog : log) };
+        } else {
+            // Clock in
+            const newLog = { 
+                id: new Date().getTime().toString(),
+                userId, 
+                loginTime: now, 
+                loginLocation: location 
+            };
+            toast({ title: 'Clocked In', description: 'Your attendance has been logged.' });
+            return { attendance: [...state.attendance, newLog] };
+        }
+      }),
+
+      setGeolocationConfig: (config: GeolocationConfig) => set(state => {
+        toast({ title: 'Settings Updated', description: 'Geolocation settings have been saved.' });
+        return { geolocation: config };
+      }),
     }),
     {
       name: "rotapro-storage",
@@ -583,4 +614,6 @@ export const useRotaStoreActions = () => useRotaStore(state => ({
     swapWeekendAssignments: state.swapWeekendAssignments,
     toggleWeekendSwapNeutralization: state.toggleWeekendSwapNeutralization,
     toggleShowExportFooter: state.toggleShowExportFooter,
+    logAttendance: state.logAttendance,
+    setGeolocationConfig: state.setGeolocationConfig,
 }));

@@ -20,7 +20,7 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, Settings, Moon, Sun, LogOut, ListTree, HelpCircle, User as UserIcon, LifeBuoy, CalendarDays, CalendarOff, GanttChartSquare } from "lucide-react";
+import { LayoutDashboard, Settings, Moon, Sun, LogOut, ListTree, HelpCircle, User as UserIcon, LifeBuoy, CalendarDays, CalendarOff, GanttChartSquare, LocateFixed } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "./ui/dropdown-menu";
@@ -253,6 +253,18 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                 <Link href="/rota">
                   <GanttChartSquare />
                   <span className="group-data-[collapsible=icon]:hidden">Rota</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <SidebarMenuButton
+                asChild
+                isActive={pathname.startsWith("/attendance")}
+                tooltip="Attendance"
+              >
+                <Link href="/attendance">
+                  <LocateFixed />
+                  <span className="group-data-[collapsible=icon]:hidden">Attendance</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

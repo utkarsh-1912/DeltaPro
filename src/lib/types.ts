@@ -87,6 +87,21 @@ export type WeekendRota = {
 // Tracks how many consecutive periods a member has had the same shift
 export type ShiftStreak = Record<string, { shiftId: string | null; count: number }>;
 
+export type AttendanceLog = {
+    id: string;
+    userId: string;
+    loginTime: string; // ISO string
+    logoutTime?: string; // ISO string
+    loginLocation: { latitude: number; longitude: number };
+    logoutLocation?: { latitude: number; longitude: number };
+};
+
+export type GeolocationConfig = {
+    officeLatitude: number;
+    officeLongitude: number;
+    radius: number; // in meters
+};
+
 export interface AppState {
   users: User[];
   teamMembers: TeamMember[];
@@ -98,11 +113,13 @@ export interface AppState {
   weekendRotas: WeekendRota[];
   lastWeekendAssigneeIndex: number;
   showExportFooter: boolean;
+  attendance: AttendanceLog[];
+  geolocation: GeolocationConfig;
   addUser: (user: User) => void;
   addTeamMember: (name: string, email: string, teamId?: string, fixedShiftId?: string) => void;
   updateTeamMember: (id: string, updates: Partial<Pick<TeamMember, 'name' | 'email' | 'teamId' | 'fixedShiftId'>>) => void;
   deleteTeamMember: (id: string) => void;
-  addTeam: (name: string) => void;
+  addTeam: (name: string, pmId?: string) => void;
   updateTeam: (id: string, name: string, pmId?: string) => void;
   deleteTeam: (id: string) => void;
   addShift: (newShift: Omit<Shift, 'id' | 'color'>) => void;
@@ -123,6 +140,8 @@ export interface AppState {
   swapWeekendAssignments: (generationId: string, memberId1: string, memberId2: string) => void;
   toggleWeekendSwapNeutralization: (generationId: string, memberId1: string, memberId2: string) => void;
   toggleShowExportFooter: () => void;
+  logAttendance: (userId: string, location: { latitude: number; longitude: number }) => void;
+  setGeolocationConfig: (config: GeolocationConfig) => void;
 }
 
 export type UserProfile = {

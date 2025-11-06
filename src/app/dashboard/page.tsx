@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowRight, LayoutDashboard, Settings, ListTree, CalendarOff, LifeBuoy, CalendarDays } from "lucide-react";
+import { ArrowRight, LayoutDashboard, Settings, ListTree, CalendarOff, LifeBuoy, CalendarDays, LocateFixed } from "lucide-react";
 
 const featureCards = [
   {
@@ -11,6 +11,12 @@ const featureCards = [
     description: "Generate, view, and manage your active team rotas.",
     href: "/rota",
     icon: <LayoutDashboard className="h-8 w-8 text-primary" />,
+  },
+  {
+    title: "Attendance",
+    description: "Clock in and out for your shift with geolocation.",
+    href: "/attendance",
+    icon: <LocateFixed className="h-8 w-8 text-primary" />,
   },
   {
     title: "Config Panel",
