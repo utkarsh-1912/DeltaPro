@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { useRotaStore, useRotaStoreActions } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
@@ -36,6 +36,9 @@ export default function AttendancePage() {
         error: null,
         position: null,
     });
+    
+    // Ref to track if user has manually interacted with the toggle
+    const hasManuallyToggled = useRef(false);
 
     const activeLog = attendance.find(log => log.userId === user?.uid && !log.logoutTime);
     const userAttendanceHistory = attendance
@@ -77,6 +80,20 @@ export default function AttendancePage() {
         return () => navigator.geolocation.clearWatch(watchId);
     }, [isWfh]);
 
+    // Automatically toggle WFH if out of range
+    useEffect(() => {
+        // Only run if location is determined, user is not clocked in, and hasn't manually toggled
+        if (distance !== null && !isInRange && !activeLog && !hasManuallyToggled.current) {
+            setIsWfh(true);
+        }
+    }, [distance, isInRange, activeLog]);
+
+    const handleWfhToggle = (checked: boolean) => {
+        setIsWfh(checked);
+        // Record that the user has manually changed the toggle
+        hasManuallyToggled.current = true;
+    }
+
     const handleClockAction = () => {
         if (!isWfh && !locationState.position) {
             toast({
@@ -93,6 +110,9 @@ export default function AttendancePage() {
         };
         
         logAttendance(user!.uid, locationData, isWfh);
+        
+        // Reset manual toggle state after action
+        hasManuallyToggled.current = false;
     };
 
     return (
@@ -114,7 +134,7 @@ export default function AttendancePage() {
                             <CardContent className="p-6 space-y-4">
                                 {!activeLog && (
                                      <div className="flex items-center space-x-2">
-                                        <Switch id="wfh-toggle" checked={isWfh} onCheckedChange={setIsWfh} />
+                                        <Switch id="wfh-toggle" checked={isWfh} onCheckedChange={handleWfhToggle} />
                                         <Label htmlFor="wfh-toggle" className="flex items-center gap-2"><Home />Work from Home</Label>
                                     </div>
                                 )}
