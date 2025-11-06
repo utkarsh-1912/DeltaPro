@@ -14,7 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, CalendarClock, Clock } from "lucide-react";
 import { getDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, isToday, endOfDay, intervalToDuration, formatDuration as formatDurationFns } from "date-fns";
+import { format, parseISO, isToday, endOfDay, intervalToDuration, formatDuration } from "date-fns";
 import type { AttendanceLog } from "@/lib/types";
 
 type GeolocationState = {
@@ -42,18 +42,27 @@ function formatIndividualDuration(start: string, end: string | undefined): strin
 }
 
 function calculateTotalDurationForDay(logs: AttendanceLog[]): string {
-    const totalMilliseconds = logs.reduce((acc, log) => {
+    const totalSeconds = logs.reduce((acc, log) => {
         if (log.logoutTime) {
-            return acc + (parseISO(log.logoutTime).getTime() - parseISO(log.loginTime).getTime());
+            const start = parseISO(log.loginTime);
+            const end = parseISO(log.logoutTime);
+            const durationInSeconds = (end.getTime() - start.getTime()) / 1000;
+            return acc + durationInSeconds;
         }
         return acc;
     }, 0);
 
-    if (totalMilliseconds === 0) {
+    if (totalSeconds === 0) {
         return '0m';
     }
     
-    return formatDurationFns({ seconds: Math.floor(totalMilliseconds / 1000) }, { format: ['hours', 'minutes'] }) || '0m';
+    const duration = intervalToDuration({ start: 0, end: totalSeconds * 1000 });
+    
+    const parts = [];
+    if (duration.hours) parts.push(`${duration.hours}h`);
+    if (duration.minutes) parts.push(`${duration.minutes}m`);
+    
+    return parts.length > 0 ? parts.join(' ') : '0m';
 }
 
 export default function AttendancePage() {
@@ -225,9 +234,9 @@ export default function AttendancePage() {
                             </Card>
                         </div>
                         <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                           <div className="space-y-4">
+                           <div className="space-y-4 flex flex-col">
                                <h3 className="font-semibold">Today's Shift</h3>
-                               <Card className="h-full">
+                               <Card className="flex-grow">
                                    <CardContent className="p-6 flex flex-col justify-center items-center h-full text-center">
                                        {currentShift ? (
                                            <>
@@ -252,9 +261,9 @@ export default function AttendancePage() {
                                    </CardContent>
                                </Card>
                            </div>
-                            <div className="space-y-4">
+                            <div className="space-y-4 flex flex-col">
                                 <h3 className="font-semibold">Your Action</h3>
-                                <Card className="h-full flex flex-col justify-center">
+                                <Card className="h-full flex flex-col justify-center flex-grow">
                                     <CardContent className="p-6 text-center">
                                         {activeLog && !isStaleSession ? (
                                             <div className="space-y-2">
