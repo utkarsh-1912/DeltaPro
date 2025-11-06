@@ -53,6 +53,10 @@ function calculateTotalDurationForDay(logs: AttendanceLog[]): string {
     }, 0);
 
     if (totalSeconds === 0) {
+        const hasInProgress = logs.some(log => !log.logoutTime);
+        if (hasInProgress && logs.length > 0) {
+            return 'In Progress';
+        }
         return '0m';
     }
     
@@ -132,7 +136,25 @@ export default function AttendancePage() {
         
         setLocationState(prev => ({...prev, loading: true }));
         const watchId = navigator.geolocation.watchPosition(
-            (pos) => setLocationState({ loading: false, error: null, position: pos }),
+            (pos) => {
+                setLocationState({ loading: false, error: null, position: pos });
+                const currentDistance = getDistance(
+                    pos.coords.latitude, pos.coords.longitude,
+                    geoConfig.officeLatitude, geoConfig.officeLongitude
+                );
+                const isNowInRange = currentDistance <= geoConfig.radius;
+
+                const currentActiveLog = get().attendance.find(log => log.userId === get().user?.uid && !log.logoutTime);
+
+                if (currentActiveLog && !currentActiveLog.isWfh && !isNowInRange) {
+                    logAttendance(get().user!.uid, undefined, false);
+                    toast({
+                        variant: "destructive",
+                        title: "Auto Clock-Out",
+                        description: "You have been automatically clocked out for moving out of the office range.",
+                    });
+                }
+            },
             (err) => {
                 setLocationState({ loading: false, error: err, position: null });
             },
@@ -140,7 +162,7 @@ export default function AttendancePage() {
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
+    }, [geoConfig, logAttendance, toast, user?.uid]);
 
     useEffect(() => {
         if (locationState.loading) return;
@@ -338,5 +360,6 @@ export default function AttendancePage() {
             </Card>
         </motion.div>
     );
+}
 
     
