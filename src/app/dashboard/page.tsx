@@ -67,7 +67,7 @@ export default function DashboardPage() {
         <Card className="mb-6">
             <CardHeader>
                 <CardTitle>Dashboard</CardTitle>
-                <CardDescription>Navigate to different sections of your RotaPro application.</CardDescription>
+                <CardDescription>Navigate to different sections of your DeltaPro application.</CardDescription>
             </CardHeader>
         </Card>
 

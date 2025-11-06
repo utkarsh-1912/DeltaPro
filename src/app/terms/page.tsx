@@ -20,13 +20,13 @@ export default function TermsPage() {
 
             <section>
               <h2 className="text-xl font-semibold text-foreground">1. Introduction</h2>
-              <p>Welcome to RotaPro by FIXpert. This application is a demonstration project provided "as is" for evaluation and showcase purposes only. By accessing or using our service, you agree to be bound by these Terms of Service and Privacy Policy. If you disagree with any part of the terms, you may not access the service.</p>
+              <p>Welcome to DeltaPro by FIXpert. This application is a demonstration project provided "as is" for evaluation and showcase purposes only. By accessing or using our service, you agree to be bound by these Terms of Service and Privacy Policy. If you disagree with any part of the terms, you may not access the service.</p>
             </section>
             
             <section>
               <h2 className="text-xl font-semibold text-foreground">2. Terms of Service</h2>
               <h3 className="text-lg font-semibold text-foreground">2.1. Account Registration</h3>
-              <p>To use the scheduling features of RotaPro, you must register for an account. You agree to provide accurate, current, and complete information during the registration process and to update such information to keep it accurate, current, and complete. You are responsible for safeguarding your password.</p>
+              <p>To use the scheduling features of DeltaPro, you must register for an account. You agree to provide accurate, current, and complete information during the registration process and to update such information to keep it accurate, current, and complete. You are responsible for safeguarding your password.</p>
               
               <h3 className="text-lg font-semibold text-foreground">2.2. Use of the Service</h3>
               <p>You agree not to use the Service for any purpose that is illegal or prohibited by these Terms. As this is a demo application, you acknowledge that functionalities may change, and data may be reset or become inaccessible without notice.</p>
@@ -41,12 +41,12 @@ export default function TermsPage() {
               </ul>
               
               <h3 className="text-lg font-semibold text-foreground">3.2. How We Use Your Information</h3>
-              <p>Your data is used exclusively to provide and operate the features of the RotaPro application. We do not sell, trade, or otherwise transfer your personally identifiable information or user-generated content to outside parties. We may use your email address to communicate with you about the service if necessary.</p>
+              <p>Your data is used exclusively to provide and operate the features of the DeltaPro application. We do not sell, trade, or otherwise transfer your personally identifiable information or user-generated content to outside parties. We may use your email address to communicate with you about the service if necessary.</p>
             </section>
             
             <section>
               <h2 className="text-xl font-semibold text-foreground">4. Limitation of Liability</h2>
-              <p>In no event shall the creators or providers of RotaPro be liable for any direct, indirect, incidental, special, or consequential damages (including, but not limited to, loss of data) arising out of, or in any way connected with, the use or inability to use this demonstration service.</p>
+              <p>In no event shall the creators or providers of DeltaPro be liable for any direct, indirect, incidental, special, or consequential damages (including, but not limited to, loss of data) arising out of, or in any way connected with, the use or inability to use this demonstration service.</p>
             </section>
             
              <section>

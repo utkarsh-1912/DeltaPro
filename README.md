@@ -1,6 +1,6 @@
-# RotaPro - Professional Rota Management
+# DeltaPro - Professional Rota Management
 
-This is a RotaPro application, a powerful, AI-driven tool for managing team schedules and rotas. It's built with Next.js, React, Tailwind CSS, ShadCN, and Firebase.
+This is a DeltaPro application, a powerful, AI-driven tool for managing team schedules and rotas. It's built with Next.js, React, Tailwind CSS, ShadCN, and Firebase.
 
 ## Getting Started
 

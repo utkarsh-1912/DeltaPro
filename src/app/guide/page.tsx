@@ -28,7 +28,7 @@ export default function GuidePage() {
     >
       <Card>
         <CardHeader>
-          <CardTitle className="text-3xl">How to use RotaPro</CardTitle>
+          <CardTitle className="text-3xl">How to use DeltaPro</CardTitle>
           <CardDescription>
             Your step-by-step guide to mastering team scheduling.
           </CardDescription>

@@ -64,7 +64,7 @@ export default function LandingPage() {
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     const recipientEmail = "go.fixpert@gmail.com";
-    const subject = "Message from RotaPro Landing Page";
+    const subject = "Message from DeltaPro Landing Page";
     const mailtoLink = `mailto:${recipientEmail}?subject=${encodeURIComponent(
       subject
     )}&body=${encodeURIComponent(
@@ -97,7 +97,7 @@ export default function LandingPage() {
                     The Future of Team Scheduling is Here
                   </h1>
                   <p className="mt-4 text-lg text-muted-foreground">
-                    RotaPro simplifies complex scheduling. Generate fair, optimized rotas, manage your team, and keep everyone in sync—effortlessly.
+                    DeltaPro simplifies complex scheduling. Generate fair, optimized rotas, manage your team, and keep everyone in sync—effortlessly.
                   </p>
                   <div className="mt-8 flex flex-col sm:flex-row justify-start gap-4">
                     <Button asChild size="lg">
@@ -129,7 +129,7 @@ export default function LandingPage() {
         <section id="features" className="py-20 md:py-24 bg-secondary">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold">Why RotaPro?</h2>
+              <h2 className="text-3xl font-bold">Why DeltaPro?</h2>
               <p className="mt-2 text-muted-foreground">Everything you need for efficient shift management.</p>
             </div>
             <div className="grid gap-8 md:grid-cols-3">

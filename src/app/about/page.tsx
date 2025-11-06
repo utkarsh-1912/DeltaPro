@@ -13,11 +13,11 @@ export default function AboutPage() {
         </Link>
         <Card>
           <CardHeader>
-            <CardTitle className="text-3xl font-extrabold tracking-tight">About RotaPro</CardTitle>
+            <CardTitle className="text-3xl font-extrabold tracking-tight">About DeltaPro</CardTitle>
           </CardHeader>
           <CardContent className="space-y-8 text-muted-foreground">
             <p className="text-lg">
-              RotaPro by FIXpert is your intelligent partner for seamless team scheduling. We transform the complex, time-consuming task of creating and managing rotas into a streamlined, automated process. Our mission is to empower managers with tools that ensure fairness, efficiency, and clarity, allowing teams to focus on what they do best.
+              DeltaPro by FIXpert is your intelligent partner for seamless team scheduling. We transform the complex, time-consuming task of creating and managing rotas into a streamlined, automated process. Our mission is to empower managers with tools that ensure fairness, efficiency, and clarity, allowing teams to focus on what they do best.
             </p>
             
             <section>
@@ -50,7 +50,7 @@ export default function AboutPage() {
             <section>
               <h3 className="text-xl font-semibold text-foreground pt-4">Our Vision</h3>
               <p>
-                We envision a world where scheduling is no longer a chore but a strategic tool that boosts operational efficiency and employee morale. By automating the tedious aspects of rota management, RotaPro gives you back your most valuable asset: time.
+                We envision a world where scheduling is no longer a chore but a strategic tool that boosts operational efficiency and employee morale. By automating the tedious aspects of rota management, DeltaPro gives you back your most valuable asset: time.
               </p>
             </section>
           </CardContent>
@@ -59,3 +59,4 @@ export default function AboutPage() {
     </div>
   );
 }
+

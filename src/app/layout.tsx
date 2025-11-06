@@ -8,7 +8,7 @@ import { FirebaseClientProvider } from "@/firebase/client-provider";
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
 export const metadata: Metadata = {
-  title: "RotaPro - Professional Rota Management",
+  title: "DeltaPro - Professional Rota Management",
   description: "Manage team shifts and generate rotas with ease.",
   icons: {
     icon: "/favicon.ico",

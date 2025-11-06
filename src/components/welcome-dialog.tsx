@@ -22,7 +22,7 @@ export function WelcomeDialog() {
           <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-primary mb-4">
             <CalendarCheck className="h-6 w-6 text-primary-foreground" />
           </div>
-          <h2 className="text-2xl font-bold text-card-foreground">Welcome to RotaPro!</h2>
+          <h2 className="text-2xl font-bold text-card-foreground">Welcome to DeltaPro!</h2>
           <p className="mt-2 text-muted-foreground">
             It looks like you haven't created any rota schedules yet. Get started by generating your first one.
           </p>

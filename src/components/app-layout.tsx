@@ -29,13 +29,12 @@ import { getAuth, signOut } from "firebase/auth";
 import { cn } from "@/lib/utils";
 
 const Logo = ({className}: {className?: string}) => (
-  <svg width="28" height="28" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <path d="M24 10C17.37 10 12 15.37 12 22C12 28.63 17.37 34 24 34C30.63 34 36 28.63 36 22" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M24 34C30.63 34 36 28.63 36 22C36 15.37 30.63 10 24 10C17.37 10 12 15.37 12 22" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" strokeDasharray="4 8"/>
-    <path d="M24 4V10" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
-    <path d="M24 34V40" stroke="currentColor" strokeWidth="4" strokeLinecap="round"/>
-  </svg>
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <path d="M14 4L4 24H24L14 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M4 24L14 14L24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
 );
+
 
 const getInitials = (name: string | null | undefined) => {
     if (!name) return "AD";
@@ -93,7 +92,7 @@ function LoggedInHeaderContent() {
                <div className="bg-primary text-primary-foreground rounded-lg flex items-center justify-center h-8 w-8">
                 <Logo />
                </div>
-               <span className="font-bold text-xl">RotaPro</span>
+               <span className="font-bold text-xl">DeltaPro</span>
             </Link>
         )}
       </div>
@@ -140,7 +139,7 @@ function PublicHeaderContent() {
         <div className="mr-4 flex items-center">
             <Link href="/" className="flex items-center gap-2">
                <Logo className="text-primary" />
-               <span className="font-bold text-xl">RotaPro</span>
+               <span className="font-bold text-xl">DeltaPro</span>
             </Link>
           </div>
           <div className="flex flex-1 items-center justify-end space-x-2">
@@ -165,7 +164,7 @@ function PublicFooter() {
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="text-center md:text-left">
                 <p className="text-sm text-muted-foreground">
-                    &copy; {new Date().getFullYear()} RotaPro. All rights reserved.
+                    &copy; {new Date().getFullYear()} DeltaPro. All rights reserved.
                 </p>
                 <p className="text-sm text-muted-foreground">
                     Build with <span className="text-blue-500">💙</span> by{' '}
@@ -223,7 +222,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                   <Logo />
               </div>
               <div className="flex flex-col">
-                  <span className="text-lg font-semibold">RotaPro</span>
+                  <span className="text-lg font-semibold">DeltaPro</span>
               </div>
             </div>
              <div className="hidden group-data-[collapsible=icon]:flex items-center justify-center">
