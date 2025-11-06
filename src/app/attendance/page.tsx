@@ -11,10 +11,10 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase } from "lucide-react";
+import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, CalendarClock } from "lucide-react";
 import { getDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, isToday, endOfDay } from "date-fns";
+import { format, parseISO, isToday, endOfDay, intervalToDuration } from "date-fns";
 
 type GeolocationState = {
     loading: boolean;
@@ -24,9 +24,26 @@ type GeolocationState = {
 
 type AttendanceType = 'wfo' | 'wfh';
 
+function formatDuration(start: string, end: string | undefined): string {
+    if (!end) {
+        return "In Progress";
+    }
+    const duration = intervalToDuration({
+        start: parseISO(start),
+        end: parseISO(end),
+    });
+
+    const parts = [];
+    if (duration.hours) parts.push(`${duration.hours}h`);
+    if (duration.minutes) parts.push(`${duration.minutes}m`);
+    
+    return parts.length > 0 ? parts.join(' ') : '0m';
+}
+
+
 export default function AttendancePage() {
     const { user } = useAuthStore();
-    const { geolocation: geoConfig, attendance } = useRotaStore();
+    const { geolocation: geoConfig, attendance, activeGenerationId, generationHistory, shifts } = useRotaStore();
     const { logAttendance } = useRotaStoreActions();
     const { toast } = useToast();
 
@@ -36,6 +53,18 @@ export default function AttendancePage() {
         error: null,
         position: null,
     });
+    
+    const activeGeneration = React.useMemo(() => 
+        generationHistory.find(g => g.id === activeGenerationId)
+    , [generationHistory, activeGenerationId]);
+
+    const shiftMap = React.useMemo(() => new Map(shifts.map(s => [s.id, s])), [shifts]);
+    
+    const currentShift = React.useMemo(() => {
+        if (!user || !activeGeneration) return null;
+        const shiftId = activeGeneration.assignments[user.uid];
+        return shiftId ? shiftMap.get(shiftId) : null;
+    }, [user, activeGeneration, shiftMap]);
 
     const activeLog = attendance.find(log => log.userId === user?.uid && !log.logoutTime);
     const userAttendanceHistory = attendance
@@ -54,7 +83,6 @@ export default function AttendancePage() {
         : null;
 
     const isInRange = distance !== null && distance <= geoConfig.radius;
-    const isWfh = attendanceType === 'wfh';
 
     const canClockIn = !activeLog && !isStaleSession;
     const canClockOut = !!activeLog && !isStaleSession;
@@ -71,7 +99,6 @@ export default function AttendancePage() {
             (pos) => setLocationState({ loading: false, error: null, position: pos }),
             (err) => {
                 setLocationState({ loading: false, error: err, position: null });
-                setAttendanceType('wfh');
             },
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
         );
@@ -81,11 +108,7 @@ export default function AttendancePage() {
 
     useEffect(() => {
         if (locationState.loading) return;
-        if (isInRange) {
-            setAttendanceType('wfo');
-        } else {
-            setAttendanceType('wfh');
-        }
+        setAttendanceType(isInRange ? 'wfo' : 'wfh');
     }, [isInRange, locationState.loading]);
 
 
@@ -99,12 +122,12 @@ export default function AttendancePage() {
             return;
         }
         
-        const locationData = isWfh ? undefined : {
+        const locationData = attendanceType === 'wfh' ? undefined : {
             latitude: locationState.position!.coords.latitude,
             longitude: locationState.position!.coords.longitude,
         };
         
-        logAttendance(user!.uid, locationData, isWfh);
+        logAttendance(user!.uid, locationData, attendanceType === 'wfh');
     };
 
     const handleForceClockOut = () => {
@@ -138,9 +161,9 @@ export default function AttendancePage() {
                             </AlertDescription>
                         </Alert>
                     )}
-                    <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-4">
-                            <h3 className="font-semibold">Your Status</h3>
+                    <div className="grid md:grid-cols-3 gap-6">
+                        <div className="md:col-span-1 space-y-4">
+                             <h3 className="font-semibold">Your Status</h3>
                             <Card className="bg-muted/50">
                                 <CardContent className="p-6 space-y-4">
                                     {locationState.loading && <Skeleton className="h-10 w-full" />}
@@ -164,39 +187,68 @@ export default function AttendancePage() {
                                     )}
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            {isWfh ? <Home className="h-5 w-5 text-primary"/> : <Briefcase className="h-5 w-5 text-primary"/>}
+                                            {attendanceType === 'wfh' ? <Home className="h-5 w-5 text-primary"/> : <Briefcase className="h-5 w-5 text-primary"/>}
                                             <span>Work Status:</span>
                                         </div>
-                                        <Badge variant={isWfh ? "secondary" : "default"}>
-                                            {isWfh ? "Work From Home" : "Work From Office"}
+                                        <Badge variant={attendanceType === 'wfh' ? "secondary" : "default"}>
+                                            {attendanceType === 'wfh' ? "Work From Home" : "Work From Office"}
                                         </Badge>
                                     </div>
                                 </CardContent>
                             </Card>
                         </div>
-                        <div className="space-y-4">
-                            <h3 className="font-semibold">Your Action</h3>
-                            <Card className="h-full flex flex-col justify-center">
-                                <CardContent className="p-6 text-center">
-                                    {activeLog && !isStaleSession ? (
-                                        <div className="space-y-2">
-                                            <p>You clocked in at:</p>
-                                            <p className="font-semibold text-lg">{format(parseISO(activeLog.loginTime), 'PPpp')}</p>
-                                            {activeLog.isWfh ? <Badge variant="secondary" className="mt-1"><Home className="mr-1.5"/>Work from Home</Badge> : <Badge className="mt-1"><Briefcase className="mr-1.5"/>Office</Badge>}
-                                            <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockOut}>
-                                                <LogOut className="mr-2" /> Clock Out
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            <p>You are currently clocked out.</p>
-                                            <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockIn || locationState.loading}>
-                                                <LogIn className="mr-2" /> Clock In as {isWfh ? "WFH" : "WFO"}
-                                            </Button>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                           <div className="space-y-4">
+                               <h3 className="font-semibold">Today's Shift</h3>
+                               <Card className="h-full">
+                                   <CardContent className="p-6 flex flex-col justify-center items-center h-full text-center">
+                                       {currentShift ? (
+                                           <>
+                                                <Badge
+                                                    variant="secondary"
+                                                    className="font-semibold text-base mb-2"
+                                                    style={{ 
+                                                        backgroundColor: currentShift.color,
+                                                        color: 'hsl(var(--card-foreground))'
+                                                    }}
+                                                >
+                                                    {currentShift.name}
+                                                </Badge>
+                                                <p className="text-lg font-mono">{currentShift.startTime} - {currentShift.endTime}</p>
+                                           </>
+                                       ) : (
+                                            <div className="flex flex-col items-center text-muted-foreground">
+                                                <CalendarClock className="h-8 w-8 mb-2" />
+                                                <p>No shift assigned today.</p>
+                                            </div>
+                                       )}
+                                   </CardContent>
+                               </Card>
+                           </div>
+                            <div className="space-y-4">
+                                <h3 className="font-semibold">Your Action</h3>
+                                <Card className="h-full flex flex-col justify-center">
+                                    <CardContent className="p-6 text-center">
+                                        {activeLog && !isStaleSession ? (
+                                            <div className="space-y-2">
+                                                <p>You clocked in at:</p>
+                                                <p className="font-semibold text-lg">{format(parseISO(activeLog.loginTime), 'PPpp')}</p>
+                                                {activeLog.isWfh ? <Badge variant="secondary" className="mt-1"><Home className="mr-1.5"/>Work from Home</Badge> : <Badge className="mt-1"><Briefcase className="mr-1.5"/>Office</Badge>}
+                                                <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockOut}>
+                                                    <LogOut className="mr-2" /> Clock Out
+                                                </Button>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                <p>You are currently clocked out.</p>
+                                                <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockIn || locationState.loading}>
+                                                    <LogIn className="mr-2" /> Clock In as {attendanceType === 'wfh' ? "WFH" : "WFO"}
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
                         </div>
                     </div>
                 </CardContent>
@@ -212,8 +264,9 @@ export default function AttendancePage() {
                         <Table>
                             <TableHeader>
                                 <TableRow>
-                                    <TableHead>Clock In Time</TableHead>
-                                    <TableHead>Clock Out Time</TableHead>
+                                    <TableHead>Clock In</TableHead>
+                                    <TableHead>Clock Out</TableHead>
+                                    <TableHead>Duration</TableHead>
                                     <TableHead>Type</TableHead>
                                 </TableRow>
                             </TableHeader>
@@ -222,13 +275,14 @@ export default function AttendancePage() {
                                     userAttendanceHistory.map(log => (
                                         <TableRow key={log.id}>
                                             <TableCell>{format(parseISO(log.loginTime), 'PPpp')}</TableCell>
-                                            <TableCell>{log.logoutTime ? format(parseISO(log.logoutTime), 'PPpp') : <Badge variant="secondary">Still Clocked In</Badge>}</TableCell>
+                                            <TableCell>{log.logoutTime ? format(parseISO(log.logoutTime), 'PPpp') : <Badge variant="secondary">In Progress</Badge>}</TableCell>
+                                            <TableCell className="font-medium">{formatDuration(log.loginTime, log.logoutTime)}</TableCell>
                                             <TableCell>{log.isWfh ? <Badge>WFH</Badge> : <Badge variant="outline">Office</Badge>}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">No attendance history found.</TableCell>
+                                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No attendance history found.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>
