@@ -11,7 +11,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, AlarmWarning } from "lucide-react";
+import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase } from "lucide-react";
 import { getDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO, isToday, endOfDay } from "date-fns";
@@ -128,7 +128,7 @@ export default function AttendancePage() {
                 <CardContent className="space-y-6">
                     {isStaleSession && (
                         <Alert variant="destructive">
-                            <AlarmWarning className="h-4 w-4" />
+                            <AlertTriangle className="h-4 w-4" />
                             <AlertTitle>Action Required: Stale Session Detected</AlertTitle>
                             <AlertDescription className="flex items-center justify-between">
                                 <div>
@@ -239,5 +239,3 @@ export default function AttendancePage() {
         </motion.div>
     );
 }
-
-    
