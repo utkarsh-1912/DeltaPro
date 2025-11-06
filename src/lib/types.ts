@@ -141,7 +141,7 @@ export interface AppState {
   swapWeekendAssignments: (generationId: string, memberId1: string, memberId2: string) => void;
   toggleWeekendSwapNeutralization: (generationId: string, memberId1: string, memberId2: string) => void;
   toggleShowExportFooter: () => void;
-  logAttendance: (userId: string, location: { latitude: number; longitude: number } | undefined, isWfh: boolean) => void;
+  logAttendance: (userId: string, location: { latitude: number; longitude: number } | undefined, isWfh: boolean, forceLogoutTime?: string) => void;
   setGeolocationConfig: (config: GeolocationConfig) => void;
 }
 
@@ -161,3 +161,5 @@ export interface AuthState {
   setProfile: (profile: UserProfile | null) => void;
   setLoading: (loading: boolean) => void;
 }
+
+    

@@ -5,16 +5,16 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRotaStore, useRotaStoreActions } from "@/lib/store";
 import { useAuthStore } from "@/lib/auth-store";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase } from "lucide-react";
+import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, AlarmWarning } from "lucide-react";
 import { getDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, isToday, endOfDay } from "date-fns";
 
 type GeolocationState = {
     loading: boolean;
@@ -41,6 +41,8 @@ export default function AttendancePage() {
     const userAttendanceHistory = attendance
         .filter(log => log.userId === user?.uid)
         .sort((a,b) => parseISO(b.loginTime).getTime() - parseISO(a.loginTime).getTime());
+    
+    const isStaleSession = activeLog ? !isToday(parseISO(activeLog.loginTime)) : false;
 
     const distance = locationState.position
         ? getDistance(
@@ -54,9 +56,8 @@ export default function AttendancePage() {
     const isInRange = distance !== null && distance <= geoConfig.radius;
     const isWfh = attendanceType === 'wfh';
 
-    // The user can always clock in/out, the type is determined automatically
-    const canClockIn = !activeLog;
-    const canClockOut = !!activeLog;
+    const canClockIn = !activeLog && !isStaleSession;
+    const canClockOut = !!activeLog && !isStaleSession;
 
     useEffect(() => {
         if (!navigator.geolocation) {
@@ -70,7 +71,7 @@ export default function AttendancePage() {
             (pos) => setLocationState({ loading: false, error: null, position: pos }),
             (err) => {
                 setLocationState({ loading: false, error: err, position: null });
-                setAttendanceType('wfh'); // Default to WFH on error
+                setAttendanceType('wfh');
             },
             { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
         );
@@ -78,10 +79,8 @@ export default function AttendancePage() {
         return () => navigator.geolocation.clearWatch(watchId);
     }, []);
 
-    // Automatically set attendance type based on location
     useEffect(() => {
         if (locationState.loading) return;
-
         if (isInRange) {
             setAttendanceType('wfo');
         } else {
@@ -108,6 +107,12 @@ export default function AttendancePage() {
         logAttendance(user!.uid, locationData, isWfh);
     };
 
+    const handleForceClockOut = () => {
+        if (!activeLog) return;
+        const autoLogoutTime = endOfDay(parseISO(activeLog.loginTime)).toISOString();
+        logAttendance(user!.uid, undefined, activeLog.isWfh || false, autoLogoutTime);
+    }
+
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -120,65 +125,79 @@ export default function AttendancePage() {
                     <CardTitle>Attendance</CardTitle>
                     <CardDescription>Clock in or out for your shift. Your status is automatically determined by your location relative to the office.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid md:grid-cols-2 gap-6">
-                    <div className="space-y-4">
-                        <h3 className="font-semibold">Your Status</h3>
-                         <Card className="bg-muted/50">
-                            <CardContent className="p-6 space-y-4">
-                                {locationState.loading && <Skeleton className="h-10 w-full" />}
-                                {locationState.error && (
-                                    <Alert variant="destructive">
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertTitle>Location Error</AlertTitle>
-                                        <AlertDescription>{locationState.error.message}. Defaulting to Work From Home.</AlertDescription>
-                                    </Alert>
-                                )}
-                                {distance !== null && !locationState.loading && (
+                <CardContent className="space-y-6">
+                    {isStaleSession && (
+                        <Alert variant="destructive">
+                            <AlarmWarning className="h-4 w-4" />
+                            <AlertTitle>Action Required: Stale Session Detected</AlertTitle>
+                            <AlertDescription className="flex items-center justify-between">
+                                <div>
+                                You forgot to clock out on {format(parseISO(activeLog!.loginTime), 'PPP')}. Please force a clock-out to continue.
+                                </div>
+                                <Button variant="destructive" onClick={handleForceClockOut}>Force Clock Out</Button>
+                            </AlertDescription>
+                        </Alert>
+                    )}
+                    <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-4">
+                            <h3 className="font-semibold">Your Status</h3>
+                            <Card className="bg-muted/50">
+                                <CardContent className="p-6 space-y-4">
+                                    {locationState.loading && <Skeleton className="h-10 w-full" />}
+                                    {locationState.error && (
+                                        <Alert variant="destructive">
+                                            <AlertTriangle className="h-4 w-4" />
+                                            <AlertTitle>Location Error</AlertTitle>
+                                            <AlertDescription>{locationState.error.message}. Defaulting to Work From Home.</AlertDescription>
+                                        </Alert>
+                                    )}
+                                    {distance !== null && !locationState.loading && (
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <MapPin className="h-5 w-5 text-muted-foreground" />
+                                                <span>Distance from office:</span>
+                                            </div>
+                                            <span className={`font-bold ${isInRange ? "text-green-600" : "text-destructive"}`}>
+                                                {distance.toFixed(0)} meters
+                                            </span>
+                                        </div>
+                                    )}
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <MapPin className="h-5 w-5 text-muted-foreground" />
-                                            <span>Distance from office:</span>
+                                            {isWfh ? <Home className="h-5 w-5 text-primary"/> : <Briefcase className="h-5 w-5 text-primary"/>}
+                                            <span>Work Status:</span>
                                         </div>
-                                        <span className={`font-bold ${isInRange ? "text-green-600" : "text-destructive"}`}>
-                                            {distance.toFixed(0)} meters
-                                        </span>
+                                        <Badge variant={isWfh ? "secondary" : "default"}>
+                                            {isWfh ? "Work From Home" : "Work From Office"}
+                                        </Badge>
                                     </div>
-                                )}
-                                 <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        {isWfh ? <Home className="h-5 w-5 text-primary"/> : <Briefcase className="h-5 w-5 text-primary"/>}
-                                        <span>Work Status:</span>
-                                    </div>
-                                    <Badge variant={isWfh ? "secondary" : "default"}>
-                                        {isWfh ? "Work From Home" : "Work From Office"}
-                                    </Badge>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                     <div className="space-y-4">
-                        <h3 className="font-semibold">Your Action</h3>
-                        <Card className="h-full flex flex-col justify-center">
-                            <CardContent className="p-6 text-center">
-                                {activeLog ? (
-                                    <div className="space-y-2">
-                                        <p>You clocked in at:</p>
-                                        <p className="font-semibold text-lg">{format(parseISO(activeLog.loginTime), 'PPpp')}</p>
-                                        {activeLog.isWfh ? <Badge variant="secondary" className="mt-1"><Home className="mr-1.5"/>Work from Home</Badge> : <Badge className="mt-1"><Briefcase className="mr-1.5"/>Office</Badge>}
-                                        <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockOut}>
-                                            <LogOut className="mr-2" /> Clock Out
-                                        </Button>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-2">
-                                        <p>You are currently clocked out.</p>
-                                        <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockIn || locationState.loading}>
-                                            <LogIn className="mr-2" /> Clock In as {isWfh ? "WFH" : "WFO"}
-                                        </Button>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
+                                </CardContent>
+                            </Card>
+                        </div>
+                        <div className="space-y-4">
+                            <h3 className="font-semibold">Your Action</h3>
+                            <Card className="h-full flex flex-col justify-center">
+                                <CardContent className="p-6 text-center">
+                                    {activeLog && !isStaleSession ? (
+                                        <div className="space-y-2">
+                                            <p>You clocked in at:</p>
+                                            <p className="font-semibold text-lg">{format(parseISO(activeLog.loginTime), 'PPpp')}</p>
+                                            {activeLog.isWfh ? <Badge variant="secondary" className="mt-1"><Home className="mr-1.5"/>Work from Home</Badge> : <Badge className="mt-1"><Briefcase className="mr-1.5"/>Office</Badge>}
+                                            <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockOut}>
+                                                <LogOut className="mr-2" /> Clock Out
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            <p>You are currently clocked out.</p>
+                                            <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockIn || locationState.loading}>
+                                                <LogIn className="mr-2" /> Clock In as {isWfh ? "WFH" : "WFO"}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
                     </div>
                 </CardContent>
             </Card>
@@ -217,7 +236,8 @@ export default function AttendancePage() {
                     </div>
                 </CardContent>
             </Card>
-
         </motion.div>
     );
 }
+
+    

@@ -2,7 +2,7 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { AppState, RotaGeneration, Shift, ShiftStreak, TeamMember, AdhocAssignments, WeekendRota, Leave, Team, User, GeolocationConfig } from "./types";
-import { startOfWeek, formatISO, parseISO, addDays, eachWeekendOfInterval, isWithinInterval, format, isSaturday } from "date-fns";
+import { startOfWeek, formatISO, parseISO, addDays, eachWeekendOfInterval, isWithinInterval, format, isSaturday, endOfDay } from "date-fns";
 import { generateNewRotaAssignments, balanceAssignments } from "./rotaGenerator";
 import { toast } from "@/hooks/use-toast";
 
@@ -531,17 +531,18 @@ export const useRotaStore = create<AppState>()(
         showExportFooter: !state.showExportFooter
       })),
 
-      logAttendance: (userId, location, isWfh) => set(state => {
+      logAttendance: (userId, location, isWfh, forceLogoutTime) => set(state => {
         const now = new Date().toISOString();
         const activeLog = state.attendance.find(log => log.userId === userId && !log.logoutTime);
+
         if (activeLog) {
             // Clock out
             const updatedLog = { 
                 ...activeLog, 
-                logoutTime: now, 
+                logoutTime: forceLogoutTime || now, 
                 logoutLocation: activeLog.isWfh ? undefined : location 
             };
-            toast({ title: 'Clocked Out', description: 'Your attendance has been logged.' });
+            toast({ title: forceLogoutTime ? 'Forced Clock Out' : 'Clocked Out', description: 'Your attendance has been updated.' });
             return { attendance: state.attendance.map(log => log.id === activeLog.id ? updatedLog : log) };
         } else {
             // Clock in
@@ -622,3 +623,5 @@ export const useRotaStoreActions = () => useRotaStore(state => ({
     logAttendance: state.logAttendance,
     setGeolocationConfig: state.setGeolocationConfig,
 }));
+
+    
