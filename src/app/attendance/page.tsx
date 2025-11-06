@@ -269,7 +269,6 @@ export default function AttendancePage() {
                                             <div className="space-y-2">
                                                 <p>You clocked in at:</p>
                                                 <p className="font-semibold text-lg">{format(parseISO(activeLog.loginTime), 'PPpp')}</p>
-                                                {activeLog.isWfh ? <Badge variant="secondary" className="mt-1"><Home className="mr-1.5"/>Work from Home</Badge> : <Badge className="mt-1"><Briefcase className="mr-1.5"/>Office</Badge>}
                                                 <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockOut}>
                                                     <LogOut className="mr-2" /> Clock Out
                                                 </Button>
@@ -339,6 +338,5 @@ export default function AttendancePage() {
             </Card>
         </motion.div>
     );
-}
 
     
