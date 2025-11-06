@@ -11,10 +11,11 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, CalendarClock } from "lucide-react";
+import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, CalendarClock, Clock } from "lucide-react";
 import { getDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, isToday, endOfDay, intervalToDuration } from "date-fns";
+import { format, parseISO, isToday, endOfDay, intervalToDuration, formatDuration as formatDurationFns } from "date-fns";
+import type { AttendanceLog } from "@/lib/types";
 
 type GeolocationState = {
     loading: boolean;
@@ -24,7 +25,7 @@ type GeolocationState = {
 
 type AttendanceType = 'wfo' | 'wfh';
 
-function formatDuration(start: string, end: string | undefined): string {
+function formatIndividualDuration(start: string, end: string | undefined): string {
     if (!end) {
         return "In Progress";
     }
@@ -40,6 +41,20 @@ function formatDuration(start: string, end: string | undefined): string {
     return parts.length > 0 ? parts.join(' ') : '0m';
 }
 
+function calculateTotalDurationForDay(logs: AttendanceLog[]): string {
+    const totalMilliseconds = logs.reduce((acc, log) => {
+        if (log.logoutTime) {
+            return acc + (parseISO(log.logoutTime).getTime() - parseISO(log.loginTime).getTime());
+        }
+        return acc;
+    }, 0);
+
+    if (totalMilliseconds === 0) {
+        return '0m';
+    }
+    
+    return formatDurationFns({ seconds: Math.floor(totalMilliseconds / 1000) }, { format: ['hours', 'minutes'] }) || '0m';
+}
 
 export default function AttendancePage() {
     const { user } = useAuthStore();
@@ -67,9 +82,21 @@ export default function AttendancePage() {
     }, [user, activeGeneration, shiftMap]);
 
     const activeLog = attendance.find(log => log.userId === user?.uid && !log.logoutTime);
-    const userAttendanceHistory = attendance
-        .filter(log => log.userId === user?.uid)
-        .sort((a,b) => parseISO(b.loginTime).getTime() - parseISO(a.loginTime).getTime());
+    
+    const userAttendanceHistoryGrouped = React.useMemo(() => {
+        const grouped: Record<string, AttendanceLog[]> = {};
+        attendance
+            .filter(log => log.userId === user?.uid)
+            .sort((a,b) => parseISO(b.loginTime).getTime() - parseISO(a.loginTime).getTime())
+            .forEach(log => {
+                const dateKey = format(parseISO(log.loginTime), 'yyyy-MM-dd');
+                if (!grouped[dateKey]) {
+                    grouped[dateKey] = [];
+                }
+                grouped[dateKey].push(log);
+            });
+        return grouped;
+    }, [attendance, user?.uid]);
     
     const isStaleSession = activeLog ? !isToday(parseISO(activeLog.loginTime)) : false;
 
@@ -257,39 +284,52 @@ export default function AttendancePage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Your Attendance History</CardTitle>
-                    <CardDescription>A log of your recent clock-in and clock-out times.</CardDescription>
+                    <CardDescription>A log of your recent clock-in and clock-out times, grouped by day.</CardDescription>
                 </CardHeader>
                 <CardContent>
-                    <div className="rounded-lg border">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Clock In</TableHead>
-                                    <TableHead>Clock Out</TableHead>
-                                    <TableHead>Duration</TableHead>
-                                    <TableHead>Type</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {userAttendanceHistory.length > 0 ? (
-                                    userAttendanceHistory.map(log => (
-                                        <TableRow key={log.id}>
-                                            <TableCell>{format(parseISO(log.loginTime), 'PPpp')}</TableCell>
-                                            <TableCell>{log.logoutTime ? format(parseISO(log.logoutTime), 'PPpp') : <Badge variant="secondary">In Progress</Badge>}</TableCell>
-                                            <TableCell className="font-medium">{formatDuration(log.loginTime, log.logoutTime)}</TableCell>
-                                            <TableCell>{log.isWfh ? <Badge>WFH</Badge> : <Badge variant="outline">Office</Badge>}</TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    <TableRow>
-                                        <TableCell colSpan={4} className="h-24 text-center text-muted-foreground">No attendance history found.</TableCell>
-                                    </TableRow>
-                                )}
-                            </TableBody>
-                        </Table>
+                    <div className="space-y-6">
+                        {Object.keys(userAttendanceHistoryGrouped).length > 0 ? (
+                            Object.entries(userAttendanceHistoryGrouped).map(([date, logs]) => (
+                                <div key={date} className="rounded-lg border">
+                                    <div className="bg-muted/50 px-4 py-3 flex justify-between items-center">
+                                        <h3 className="font-semibold">{format(parseISO(date), 'EEEE, d MMMM yyyy')}</h3>
+                                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+                                            <Clock className="h-4 w-4" />
+                                            <span>Total: {calculateTotalDurationForDay(logs)}</span>
+                                        </div>
+                                    </div>
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Clock In</TableHead>
+                                                <TableHead>Clock Out</TableHead>
+                                                <TableHead>Duration</TableHead>
+                                                <TableHead>Type</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {logs.map(log => (
+                                                <TableRow key={log.id}>
+                                                    <TableCell>{format(parseISO(log.loginTime), 'p')}</TableCell>
+                                                    <TableCell>{log.logoutTime ? format(parseISO(log.logoutTime), 'p') : <Badge variant="secondary">In Progress</Badge>}</TableCell>
+                                                    <TableCell className="font-medium">{formatIndividualDuration(log.loginTime, log.logoutTime)}</TableCell>
+                                                    <TableCell>{log.isWfh ? <Badge>WFH</Badge> : <Badge variant="outline">Office</Badge>}</TableCell>
+                                                </TableRow>
+                                            ))}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-24 text-center text-muted-foreground flex items-center justify-center border rounded-lg">
+                                No attendance history found.
+                            </div>
+                        )}
                     </div>
                 </CardContent>
             </Card>
         </motion.div>
     );
 }
+
+    
