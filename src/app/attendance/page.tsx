@@ -11,10 +11,12 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin } from "lucide-react";
+import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home } from "lucide-react";
 import { getDistance } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { format, parseISO } from "date-fns";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 type GeolocationState = {
     loading: boolean;
@@ -28,6 +30,7 @@ export default function AttendancePage() {
     const { logAttendance } = useRotaStoreActions();
     const { toast } = useToast();
 
+    const [isWfh, setIsWfh] = useState(false);
     const [locationState, setLocationState] = useState<GeolocationState>({
         loading: true,
         error: null,
@@ -49,13 +52,22 @@ export default function AttendancePage() {
         : null;
 
     const isInRange = distance !== null && distance <= geoConfig.radius;
+    const canClockIn = isInRange || isWfh;
+    const canClockOut = activeLog ? (activeLog.isWfh ? true : isInRange) : false;
+
 
     useEffect(() => {
+        if (isWfh) {
+            setLocationState(prev => ({ ...prev, loading: false, error: null }));
+            return;
+        }
+
         if (!navigator.geolocation) {
             setLocationState({ loading: false, error: { code: 0, message: "Geolocation is not supported by this browser.", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }, position: null });
             return;
         }
-
+        
+        setLocationState(prev => ({...prev, loading: true }));
         const watchId = navigator.geolocation.watchPosition(
             (pos) => setLocationState({ loading: false, error: null, position: pos }),
             (err) => setLocationState({ loading: false, error: err, position: null }),
@@ -63,10 +75,10 @@ export default function AttendancePage() {
         );
 
         return () => navigator.geolocation.clearWatch(watchId);
-    }, []);
+    }, [isWfh]);
 
     const handleClockAction = () => {
-        if (!locationState.position) {
+        if (!isWfh && !locationState.position) {
             toast({
                 variant: "destructive",
                 title: "Location Error",
@@ -74,10 +86,13 @@ export default function AttendancePage() {
             });
             return;
         }
-        logAttendance(user!.uid, {
-            latitude: locationState.position.coords.latitude,
-            longitude: locationState.position.coords.longitude,
-        });
+        
+        const locationData = isWfh ? undefined : {
+            latitude: locationState.position!.coords.latitude,
+            longitude: locationState.position!.coords.longitude,
+        };
+        
+        logAttendance(user!.uid, locationData, isWfh);
     };
 
     return (
@@ -90,22 +105,28 @@ export default function AttendancePage() {
             <Card>
                 <CardHeader>
                     <CardTitle>Attendance</CardTitle>
-                    <CardDescription>Clock in or out for your shift. Your location must be within {geoConfig.radius} meters of the office.</CardDescription>
+                    <CardDescription>Clock in or out for your shift. Your location must be within {geoConfig.radius} meters of the office, or select "Work from Home".</CardDescription>
                 </CardHeader>
                 <CardContent className="grid md:grid-cols-2 gap-6">
                     <div className="space-y-4">
                         <h3 className="font-semibold">Your Status</h3>
-                        <Card>
+                         <Card className="bg-muted/50">
                             <CardContent className="p-6 space-y-4">
-                                {locationState.loading && <Skeleton className="h-10 w-full" />}
-                                {locationState.error && (
+                                {!activeLog && (
+                                     <div className="flex items-center space-x-2">
+                                        <Switch id="wfh-toggle" checked={isWfh} onCheckedChange={setIsWfh} />
+                                        <Label htmlFor="wfh-toggle" className="flex items-center gap-2"><Home />Work from Home</Label>
+                                    </div>
+                                )}
+                                {locationState.loading && !isWfh && <Skeleton className="h-10 w-full" />}
+                                {locationState.error && !isWfh && (
                                     <Alert variant="destructive">
                                         <AlertTriangle className="h-4 w-4" />
                                         <AlertTitle>Location Error</AlertTitle>
                                         <AlertDescription>{locationState.error.message}</AlertDescription>
                                     </Alert>
                                 )}
-                                {locationState.position && distance !== null && (
+                                {locationState.position && distance !== null && !isWfh && (
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2">
                                             <MapPin className="h-5 w-5 text-muted-foreground" />
@@ -116,12 +137,14 @@ export default function AttendancePage() {
                                         </span>
                                     </div>
                                 )}
-                                <div className="flex items-center justify-between">
+                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        {isInRange ? <CheckCircle className="h-5 w-5 text-green-600" /> : <AlertTriangle className="h-5 w-5 text-destructive" />}
+                                        {(isInRange || isWfh) ? <CheckCircle className="h-5 w-5 text-green-600" /> : <AlertTriangle className="h-5 w-5 text-destructive" />}
                                         <span>Clock-in Status:</span>
                                     </div>
-                                    <Badge variant={isInRange ? "default" : "destructive"}>{isInRange ? "In Range" : "Out of Range"}</Badge>
+                                    <Badge variant={(isInRange || isWfh) ? "default" : "destructive"}>
+                                        {isWfh ? "WFH Active" : (isInRange ? "In Range" : "Out of Range")}
+                                    </Badge>
                                 </div>
                             </CardContent>
                         </Card>
@@ -134,19 +157,20 @@ export default function AttendancePage() {
                                     <div className="space-y-2">
                                         <p>You clocked in at:</p>
                                         <p className="font-semibold text-lg">{format(parseISO(activeLog.loginTime), 'PPpp')}</p>
-                                        <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!isInRange}>
+                                        {activeLog.isWfh && <Badge variant="secondary" className="mt-1"><Home className="mr-1.5"/>Work from Home</Badge>}
+                                        <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockOut}>
                                             <LogOut className="mr-2" /> Clock Out
                                         </Button>
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
                                         <p>You are currently clocked out.</p>
-                                        <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!isInRange}>
+                                        <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockIn}>
                                             <LogIn className="mr-2" /> Clock In
                                         </Button>
                                     </div>
                                 )}
-                                {!isInRange && <p className="text-xs text-muted-foreground mt-2">You must be within the specified radius to clock in or out.</p>}
+                                 {!(activeLog ? canClockOut : canClockIn) && <p className="text-xs text-muted-foreground mt-2">You must be within the specified radius to clock in or out.</p>}
                             </CardContent>
                         </Card>
                     </div>
@@ -165,6 +189,7 @@ export default function AttendancePage() {
                                 <TableRow>
                                     <TableHead>Clock In Time</TableHead>
                                     <TableHead>Clock Out Time</TableHead>
+                                    <TableHead>Type</TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -173,11 +198,12 @@ export default function AttendancePage() {
                                         <TableRow key={log.id}>
                                             <TableCell>{format(parseISO(log.loginTime), 'PPpp')}</TableCell>
                                             <TableCell>{log.logoutTime ? format(parseISO(log.logoutTime), 'PPpp') : <Badge variant="secondary">Still Clocked In</Badge>}</TableCell>
+                                            <TableCell>{log.isWfh ? <Badge>WFH</Badge> : <Badge variant="outline">Office</Badge>}</TableCell>
                                         </TableRow>
                                     ))
                                 ) : (
                                     <TableRow>
-                                        <TableCell colSpan={2} className="h-24 text-center text-muted-foreground">No attendance history found.</TableCell>
+                                        <TableCell colSpan={3} className="h-24 text-center text-muted-foreground">No attendance history found.</TableCell>
                                     </TableRow>
                                 )}
                             </TableBody>

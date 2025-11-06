@@ -92,8 +92,9 @@ export type AttendanceLog = {
     userId: string;
     loginTime: string; // ISO string
     logoutTime?: string; // ISO string
-    loginLocation: { latitude: number; longitude: number };
+    loginLocation?: { latitude: number; longitude: number };
     logoutLocation?: { latitude: number; longitude: number };
+    isWfh?: boolean;
 };
 
 export type GeolocationConfig = {
@@ -140,7 +141,7 @@ export interface AppState {
   swapWeekendAssignments: (generationId: string, memberId1: string, memberId2: string) => void;
   toggleWeekendSwapNeutralization: (generationId: string, memberId1: string, memberId2: string) => void;
   toggleShowExportFooter: () => void;
-  logAttendance: (userId: string, location: { latitude: number; longitude: number }) => void;
+  logAttendance: (userId: string, location: { latitude: number; longitude: number } | undefined, isWfh: boolean) => void;
   setGeolocationConfig: (config: GeolocationConfig) => void;
 }
 

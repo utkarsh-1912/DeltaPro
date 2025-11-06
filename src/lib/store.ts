@@ -531,12 +531,16 @@ export const useRotaStore = create<AppState>()(
         showExportFooter: !state.showExportFooter
       })),
 
-      logAttendance: (userId, location) => set(state => {
+      logAttendance: (userId, location, isWfh) => set(state => {
         const now = new Date().toISOString();
         const activeLog = state.attendance.find(log => log.userId === userId && !log.logoutTime);
         if (activeLog) {
             // Clock out
-            const updatedLog = { ...activeLog, logoutTime: now, logoutLocation: location };
+            const updatedLog = { 
+                ...activeLog, 
+                logoutTime: now, 
+                logoutLocation: activeLog.isWfh ? undefined : location 
+            };
             toast({ title: 'Clocked Out', description: 'Your attendance has been logged.' });
             return { attendance: state.attendance.map(log => log.id === activeLog.id ? updatedLog : log) };
         } else {
@@ -545,7 +549,8 @@ export const useRotaStore = create<AppState>()(
                 id: new Date().getTime().toString(),
                 userId, 
                 loginTime: now, 
-                loginLocation: location 
+                loginLocation: isWfh ? undefined : location,
+                isWfh: isWfh,
             };
             toast({ title: 'Clocked In', description: 'Your attendance has been logged.' });
             return { attendance: [...state.attendance, newLog] };
