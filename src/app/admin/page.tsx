@@ -13,12 +13,7 @@ import { GeolocationManager } from "@/components/admin/geolocation-manager";
 
 export default function AdminPage() {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="p-4 sm:p-6"
-    >
+    <div className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Config Panel</CardTitle>
@@ -36,7 +31,7 @@ export default function AdminPage() {
             <TabsContent value="members" className="mt-6">
               <TeamManager />
             </TabsContent>
-             <TabsContent value="teams" className="mt-6">
+            <TabsContent value="teams" className="mt-6">
               <TeamsManager />
             </TabsContent>
             <TabsContent value="shifts" className="mt-6">
@@ -46,11 +41,11 @@ export default function AdminPage() {
               <RoleManager />
             </TabsContent>
             <TabsContent value="geolocation" className="mt-6">
-                <GeolocationManager />
+              <GeolocationManager />
             </TabsContent>
           </Tabs>
         </CardContent>
       </Card>
-    </motion.div>
+    </div>
   );
 }

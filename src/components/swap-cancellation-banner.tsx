@@ -22,8 +22,8 @@ function getSwapDetails(gen: RotaGeneration, shiftMap: Map<string, Shift>, membe
     if (!member1 || !member2) return null;
 
     // The shift recorded in assignments is their NEW shift, so the original shifts are swapped
-    const member1OriginalShift = shiftMap.get(gen.assignments[swap.memberId2]);
-    const member2OriginalShift = shiftMap.get(gen.assignments[swap.memberId1]);
+    const member1OriginalShift = shiftMap.get(gen.assignments[swap.memberId2]!);
+    const member2OriginalShift = shiftMap.get(gen.assignments[swap.memberId1]!);
 
     if (!member1OriginalShift || !member2OriginalShift) return null;
 
@@ -50,10 +50,10 @@ export function SwapCancellationBanner() {
 
         const activeGeneration = generationHistory.find(g => g.id === activeGenerationId);
         if (!activeGeneration) return null;
-        
+
         const shiftMap = new Map(shifts.map(s => [s.id, s]));
         const memberMap = new Map((activeGeneration.teamMembersAtGeneration || []).map(m => [m.id, m]));
-        
+
         // Find all historical swaps that haven't been cancelled out
         const historicalSwaps = generationHistory
             .filter(gen => gen.id !== activeGeneration.id && gen.manualSwaps && gen.manualSwaps.length > 0)
@@ -75,7 +75,7 @@ export function SwapCancellationBanner() {
         return null;
 
     }, [activeGenerationId, generationHistory, shifts]);
-    
+
 
     if (!opportunity) {
         return null;
@@ -88,20 +88,20 @@ export function SwapCancellationBanner() {
             description: `Shifts for ${opportunity.members} have been swapped back, cancelling out the manual change from ${format(parseISO(opportunity.originalGenDate), 'd MMM yyyy')}.`,
         });
     };
-    
+
     return (
         <Card className="bg-accent border-primary/50">
             <CardHeader className="flex flex-row items-center justify-between p-4">
-                 <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3">
                     <Recycle className="h-5 w-5 text-primary" />
                     <div>
                         <CardTitle className="text-base">Cancel Out a Past Swap</CardTitle>
                         <CardDescription>
-                           A chance has come up to cancel the manual swap between <span className="font-semibold">{opportunity.members}</span> from {format(parseISO(opportunity.originalGenDate), 'd MMM yyyy')}.
+                            A chance has come up to cancel the manual swap between <span className="font-semibold">{opportunity.members}</span> from {format(parseISO(opportunity.originalGenDate), 'd MMM yyyy')}.
                         </CardDescription>
                     </div>
                 </div>
-                 <Button onClick={handleSwapBack}>
+                <Button onClick={handleSwapBack}>
                     Swap Back
                 </Button>
             </CardHeader>

@@ -1,6 +1,3 @@
-
-import type { User as AuthUser } from "firebase/auth";
-
 export interface User {
   id: string;
   name: string;
@@ -23,7 +20,7 @@ export interface TeamMember {
 }
 
 export interface Shift {
-  id:string;
+  id: string;
   name: string;
   startTime: string;
   endTime: string;
@@ -39,15 +36,15 @@ export interface Shift {
 export type RotaAssignments = Record<string, string | undefined>;
 
 export type ManualSwap = {
-    memberId1: string;
-    memberId2: string;
-    neutralized?: boolean; // To track if a swap has been canceled out
+  memberId1: string;
+  memberId2: string;
+  neutralized?: boolean; // To track if a swap has been canceled out
 }
 
 export type ManualWeekendSwap = {
-    memberId1: string;
-    memberId2: string;
-    neutralized?: boolean;
+  memberId1: string;
+  memberId2: string;
+  neutralized?: boolean;
 }
 
 // Adhoc status for a rota generation
@@ -88,19 +85,19 @@ export type WeekendRota = {
 export type ShiftStreak = Record<string, { shiftId: string | null; count: number }>;
 
 export type AttendanceLog = {
-    id: string;
-    userId: string;
-    loginTime: string; // ISO string
-    logoutTime?: string; // ISO string
-    loginLocation?: { latitude: number; longitude: number };
-    logoutLocation?: { latitude: number; longitude: number };
-    isWfh?: boolean;
+  id: string;
+  userId: string;
+  loginTime: string; // ISO string
+  logoutTime?: string; // ISO string
+  loginLocation?: { latitude: number; longitude: number };
+  logoutLocation?: { latitude: number; longitude: number };
+  isWfh?: boolean;
 };
 
 export type GeolocationConfig = {
-    officeLatitude: number;
-    officeLongitude: number;
-    radius: number; // in meters
+  officeLatitude: number;
+  officeLongitude: number;
+  radius: number; // in meters
 };
 
 export interface AppState {
@@ -153,13 +150,3 @@ export type UserProfile = {
   role: 'admin' | 'hr' | 'pm' | 'user';
 };
 
-export interface AuthState {
-  user: AuthUser | null;
-  profile: UserProfile | null;
-  loading: boolean;
-  setUser: (user: AuthUser | null) => void;
-  setProfile: (profile: UserProfile | null) => void;
-  setLoading: (loading: boolean) => void;
-}
-
-    

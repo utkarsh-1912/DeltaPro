@@ -1,18 +1,17 @@
-
 "use client";
 
 import { useMemo } from 'react';
-import { useAuthStore } from '@/lib/auth-store';
+import { useSession } from 'next-auth/react';
 import { useRotaStore } from '@/lib/store';
 
 export function useAccessControl() {
-  const { profile } = useAuthStore();
+  const { data: session } = useSession();
   const { teams } = useRotaStore();
 
-  const role = profile?.role || 'user';
-  
-  // This logic is now corrected and simplified.
-  // It directly checks the role to determine access to the admin page.
+  const role = session?.user?.role?.toLowerCase() || 'user';
+  const userId = session?.user?.id;
+
+  // Role checks
   const canAccessAdmin = useMemo(() => {
     return role === 'admin' || role === 'hr' || role === 'pm';
   }, [role]);
@@ -23,12 +22,12 @@ export function useAccessControl() {
       return teams;
     }
     // PMs can only see the teams they are assigned to.
-    if (role === 'pm' && profile?.id) {
-       return teams.filter(team => team.pmId === profile.id);
+    if (role === 'pm' && userId) {
+      return teams.filter(team => team.pmId === userId);
     }
     // Users and others see no teams by default.
     return [];
-  }, [role, teams, profile?.id]);
+  }, [role, teams, userId]);
 
   return { role, canAccessAdmin, accessibleTeams };
 }

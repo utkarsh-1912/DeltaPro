@@ -22,9 +22,9 @@ import {
 
 const SIDEBAR_COOKIE_NAME = "sidebar_state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3.5rem"
+const SIDEBAR_WIDTH = "var(--sidebar-width)"
+const SIDEBAR_WIDTH_MOBILE = "var(--sidebar-width)"
+const SIDEBAR_WIDTH_ICON = "var(--sidebar-collapsed-width)"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
 
 type SidebarContext = {
@@ -124,19 +124,19 @@ const SidebarProvider = React.forwardRef<
       }),
       [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
     )
-    
+
     React.useEffect(() => {
-        if (typeof window === 'undefined') return;
-        if (isMobile) {
-            setOpen(false)
-        } else {
-            const cookie = document.cookie
-                .split(";")
-                .find((c) => c.trim().startsWith(`${SIDEBAR_COOKIE_NAME}=`))
-            if (cookie) {
-                setOpen(cookie.split("=")[1] === "true")
-            }
+      if (typeof window === 'undefined') return;
+      if (isMobile) {
+        setOpen(false)
+      } else {
+        const cookie = document.cookie
+          .split(";")
+          .find((c) => c.trim().startsWith(`${SIDEBAR_COOKIE_NAME}=`))
+        if (cookie) {
+          setOpen(cookie.split("=")[1] === "true")
         }
+      }
     }, [isMobile, setOpen]);
 
 
@@ -226,11 +226,14 @@ const Sidebar = React.forwardRef<
     return (
       <div
         ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
+        className="group peer hidden md:block text-sidebar-foreground transition-[width] duration-300 ease-in-out"
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
+        style={{
+          width: state === "expanded" ? "var(--sidebar-width)" : "var(--sidebar-width-icon)"
+        }}
       >
         <div
           className={cn(
@@ -243,8 +246,8 @@ const Sidebar = React.forwardRef<
           )}
           {...props}
         >
-            <SidebarRail />
-            {children}
+          <SidebarRail />
+          {children}
         </div>
       </div>
     )
@@ -311,15 +314,13 @@ const SidebarInset = React.forwardRef<
   HTMLDivElement,
   React.ComponentProps<"main">
 >(({ className, ...props }, ref) => {
-    const {isMobile, state} = useSidebar()
+  const { isMobile, state } = useSidebar()
 
   return (
     <main
       ref={ref}
       className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background transition-[margin-left] duration-300 ease-in-out",
-        !isMobile && state === 'expanded' && 'md:ml-[var(--sidebar-width)]',
-        !isMobile && state === 'collapsed' && 'md:ml-[var(--sidebar-width-icon)]',
+        "relative flex min-h-svh flex-1 flex-col bg-background transition-all duration-300 ease-in-out",
         className
       )}
       {...props}
@@ -611,7 +612,7 @@ const SidebarMenuAction = React.forwardRef<
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
         className
       )}
       {...props}

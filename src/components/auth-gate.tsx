@@ -2,56 +2,31 @@
 
 import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuthStore } from "@/lib/auth-store";
-import { useUser } from "@/firebase/provider";
-import { doc, getFirestore, onSnapshot } from "firebase/firestore";
-import type { UserProfile } from "@/lib/types";
+import { useSession } from "next-auth/react";
 
 const PUBLIC_PATHS = ["/", "/login", "/signup", "/about", "/contact", "/terms"];
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, isUserLoading } = useUser();
-  const { setUser, setProfile, setLoading } = useAuthStore();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    setUser(user);
-    setLoading(isUserLoading);
-    
-    let unsubscribe: () => void = () => {};
-
-    if (user) {
-      const firestore = getFirestore();
-      const profileRef = doc(firestore, "users", user.uid);
-      unsubscribe = onSnapshot(profileRef, (docSnap) => {
-        if (docSnap.exists()) {
-          setProfile(docSnap.data() as UserProfile);
-        } else {
-          setProfile(null);
-        }
-      });
-    } else {
-      setProfile(null);
-    }
-    
-    return () => unsubscribe();
-    
-  }, [user, isUserLoading, setProfile, setUser, setLoading]);
-
-  useEffect(() => {
-    if (!isUserLoading && !user) {
+    if (status === "unauthenticated") {
       // Allow access to public pages
       if (!PUBLIC_PATHS.includes(pathname)) {
         router.replace(`/login?redirect=${pathname}`);
       }
     }
-  }, [isUserLoading, user, router, pathname]);
+  }, [status, router, pathname]);
 
-  if (isUserLoading && !PUBLIC_PATHS.includes(pathname)) {
+  if (status === "loading" && !PUBLIC_PATHS.includes(pathname)) {
     return (
-      <div className="flex h-screen items-center justify-center">
-        <p>Loading...</p>
+      <div className="flex h-screen w-full items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-10 w-10 animate-spin rounded-full border-b-2 border-primary"></div>
+          <p className="text-muted-foreground">Authenticating...</p>
+        </div>
       </div>
     );
   }

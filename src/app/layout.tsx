@@ -3,7 +3,11 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { ThemeProvider } from "@/components/theme-provider";
-import { FirebaseClientProvider } from "@/firebase/client-provider";
+import { SessionProvider } from "next-auth/react";
+import { DBHydrationProvider } from "@/components/db-hydration-provider";
+
+import AuthGate from "@/components/auth-gate";
+import { AppLayout } from "@/components/app-layout";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 
@@ -30,16 +34,22 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="font-body antialiased" suppressHydrationWarning>
-        <FirebaseClientProvider>
+        <SessionProvider>
           <ThemeProvider
             attribute="class"
             defaultTheme="system"
             enableSystem
           >
-            {children}
+            <DBHydrationProvider>
+              <AuthGate>
+                <AppLayout>
+                  {children}
+                </AppLayout>
+              </AuthGate>
+            </DBHydrationProvider>
             <Toaster />
           </ThemeProvider>
-        </FirebaseClientProvider>
+        </SessionProvider>
       </body>
     </html>
   );

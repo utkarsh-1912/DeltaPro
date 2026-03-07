@@ -20,24 +20,23 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { getUserRole } from "@/lib/auth-roles";
-import { getFirestore, doc, updateDoc } from "firebase/firestore";
 import { Loader } from "lucide-react";
 
 // This is a mocked function. In a real scenario, this would
 // make an API call to a backend that reads the Google Sheet.
 async function syncRolesFromSheet(): Promise<Record<string, 'admin' | 'pm' | 'hr' | 'user'>> {
-    console.log("Simulating a fetch from Google Sheets...");
-    // Example data that would come from your spreadsheet
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve({
-                "admin@rotapro.com": "admin",
-                "pm@rotapro.com": "pm",
-                "hr@rotapro.com": "hr",
-                // ... any other roles defined in your sheet
-            });
-        }, 1000);
-    });
+  console.log("Simulating a fetch from Google Sheets...");
+  // Example data that would come from your spreadsheet
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve({
+        "admin@rotapro.com": "admin",
+        "pm@rotapro.com": "pm",
+        "hr@rotapro.com": "hr",
+        // ... any other roles defined in your sheet
+      });
+    }, 1000);
+  });
 }
 
 
@@ -50,50 +49,48 @@ export function RoleManager() {
   React.useEffect(() => {
     const roles: Record<string, UserProfile['role']> = {};
     users.forEach(user => {
-        if(user.email) {
-            roles[user.id] = getUserRole(user.email);
-        }
+      if (user.email) {
+        roles[user.id] = getUserRole(user.email);
+      }
     });
     setUserRoles(roles);
   }, [users]);
-  
+
   const handleSync = async () => {
     setIsLoading(true);
     toast({ title: "Syncing Roles...", description: "Fetching the latest roles from the spreadsheet." });
-    
-    try {
-        const sheetRoles = await syncRolesFromSheet();
-        const updatedRoles: Record<string, UserProfile['role']> = { ...userRoles };
-        let changes = 0;
 
-        users.forEach(user => {
-            const sheetRole = user.email ? sheetRoles[user.email.toLowerCase()] : undefined;
-            if (sheetRole && updatedRoles[user.id] !== sheetRole) {
-                updatedRoles[user.id] = sheetRole;
-                // Here you would also call the function to update Firestore
-                // await updateUserRoleInDb(user.id, sheetRole);
-                changes++;
-            }
-        });
-        
-        setUserRoles(updatedRoles);
-        toast({ title: "Sync Complete", description: `${changes} role(s) were updated from the sheet.` });
+    try {
+      const sheetRoles = await syncRolesFromSheet();
+      const updatedRoles: Record<string, UserProfile['role']> = { ...userRoles };
+      let changes = 0;
+
+      users.forEach(user => {
+        const sheetRole = user.email ? sheetRoles[user.email.toLowerCase()] : undefined;
+        if (sheetRole && updatedRoles[user.id] !== sheetRole) {
+          updatedRoles[user.id] = sheetRole;
+          // Here you would also call the function to update Prisma/DB
+          // await updateUserRoleInDb(user.id, sheetRole);
+          changes++;
+        }
+      });
+
+      setUserRoles(updatedRoles);
+      toast({ title: "Sync Complete", description: `${changes} role(s) were updated from the sheet.` });
     } catch (error) {
-        console.error("Failed to sync with Google Sheet:", error);
-        toast({ variant: "destructive", title: "Sync Failed", description: "Could not fetch data from the spreadsheet." });
+      console.error("Failed to sync with Google Sheet:", error);
+      toast({ variant: "destructive", title: "Sync Failed", description: "Could not fetch data from the spreadsheet." });
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }
 
 
   const handleRoleChange = async (userId: string, newRole: UserProfile['role']) => {
-    const firestore = getFirestore();
-    const userDocRef = doc(firestore, "users", userId);
-
     try {
-      await updateDoc(userDocRef, { role: newRole });
-      setUserRoles(prev => ({...prev, [userId]: newRole }));
+      // Simulate API call to Prisma update
+      await new Promise(r => setTimeout(r, 500));
+      setUserRoles(prev => ({ ...prev, [userId]: newRole }));
       toast({
         title: "Role Updated",
         description: `The user's role has been changed to ${newRole}.`,
@@ -107,7 +104,7 @@ export function RoleManager() {
       });
     }
   };
-  
+
 
   return (
     <Card>
@@ -118,9 +115,9 @@ export function RoleManager() {
             Assign roles to users. Roles determine access permissions across the app.
           </CardDescription>
         </div>
-         <Button onClick={handleSync} disabled={isLoading}>
-            {isLoading && <Loader className="mr-2 animate-spin" />}
-            Sync from Sheet
+        <Button onClick={handleSync} disabled={isLoading}>
+          {isLoading && <Loader className="mr-2 animate-spin" />}
+          Sync from Sheet
         </Button>
       </CardHeader>
       <CardContent>
@@ -156,11 +153,11 @@ export function RoleManager() {
               </TableRow>
             ))}
             {users.length === 0 && (
-                <TableRow>
-                    <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
-                        No users found in the system.
-                    </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={3} className="text-center text-muted-foreground h-24">
+                  No users found in the system.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>

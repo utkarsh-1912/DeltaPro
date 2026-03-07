@@ -16,6 +16,7 @@ import { downloadCsv } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import type { RotaGeneration, Shift, TeamMember, Leave } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { motion } from "framer-motion";
 import { Bar, Pie, Cell, ResponsiveContainer, BarChart as RechartsBarChart, PieChart as RechartsPieChart, XAxis, YAxis, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
@@ -35,13 +36,13 @@ function AnalyticsDashboard() {
         activeGenerationId: state.activeGenerationId,
         weekendRotas: state.weekendRotas,
     }));
-    
+
     const memberMap = React.useMemo(() => new Map(teamMembers.map(m => [m.id, m])), [teamMembers]);
     const shiftMap = React.useMemo(() => new Map(shifts.map(s => [s.id, s])), [shifts]);
-    
-    const activeGeneration = React.useMemo(() => 
+
+    const activeGeneration = React.useMemo(() =>
         generationHistory.find(g => g.id === activeGenerationId)
-    , [generationHistory, activeGenerationId]);
+        , [generationHistory, activeGenerationId]);
 
     // Data for Active Rota Shift Distribution (Pie Chart)
     const activeRotaDistribution = React.useMemo(() => {
@@ -57,7 +58,7 @@ function AnalyticsDashboard() {
                 }
             }
         });
-        
+
         return Object.entries(counts).map(([name, value], index) => ({
             name,
             value,
@@ -69,7 +70,7 @@ function AnalyticsDashboard() {
     const quarterlyShiftDistribution = React.useMemo(() => {
         const threeMonthsAgo = subMonths(new Date(), 3);
         const memberShiftCounts: Record<string, Record<string, number>> = {};
-        
+
         teamMembers.forEach(member => {
             memberShiftCounts[member.id] = {};
         });
@@ -80,7 +81,7 @@ function AnalyticsDashboard() {
                     if (shiftId && memberMap.has(memberId)) {
                         const shiftName = shiftMap.get(shiftId)?.name;
                         if (shiftName) {
-                             if (!memberShiftCounts[memberId]) memberShiftCounts[memberId] = {};
+                            if (!memberShiftCounts[memberId]) memberShiftCounts[memberId] = {};
                             memberShiftCounts[memberId][shiftName] = (memberShiftCounts[memberId][shiftName] || 0) + 1;
                         }
                     }
@@ -108,13 +109,13 @@ function AnalyticsDashboard() {
                     if (memberMap.has(memberId)) {
                         const dutyCount = Object.values(weekData).filter(v => v).length;
                         if (dutyCount > 0) {
-                        adhocCounts[memberId] = (adhocCounts[memberId] || 0) + dutyCount;
+                            adhocCounts[memberId] = (adhocCounts[memberId] || 0) + dutyCount;
                         }
                     }
                 });
             }
         });
-        
+
         return Object.entries(adhocCounts)
             .map(([memberId, count]) => ({
                 name: memberMap.get(memberId)?.name || 'Unknown',
@@ -123,100 +124,132 @@ function AnalyticsDashboard() {
             .filter(d => d.duties > 0);
 
     }, [generationHistory, teamMembers, memberMap]);
-    
+
     const shiftChartConfig = React.useMemo(() => {
         const config: any = {};
         shifts.forEach(shift => {
             config[shift.name] = {
                 label: shift.name,
-                color: shift.color.startsWith('var(') ? shift.color.replace('var(--', 'hsl(var(--').slice(0,-1) : shift.color
+                color: shift.color.startsWith('var(') ? shift.color.replace('var(--', 'hsl(var(--').slice(0, -1) : shift.color
             };
         });
         return config;
     }, [shifts]);
 
+    const containerVariants = {
+        hidden: { opacity: 0 },
+        visible: {
+            opacity: 1,
+            transition: {
+                staggerChildren: 0.1
+            }
+        }
+    };
+
+    const itemVariants = {
+        hidden: { opacity: 0, y: 20 },
+        visible: {
+            opacity: 1,
+            y: 0,
+            transition: { duration: 0.5 }
+        }
+    };
+
     return (
-        <div className="mb-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Analytics Dashboard</CardTitle>
-                    <CardDescription>
-                        Visual insights into your team's scheduling metrics.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg"><PieChart/> Active Rota Shift Distribution</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                             {activeRotaDistribution.length > 0 ? (
-                                <ChartContainer config={{}} className="h-[250px] w-full">
-                                    <RechartsPieChart>
-                                        <RechartsTooltip content={<ChartTooltipContent hideLabel />} />
-                                        <Pie data={activeRotaDistribution} dataKey="value" nameKey="name" innerRadius={50}>
-                                            {activeRotaDistribution.map((entry, index) => (
-                                                <Cell key={`cell-${index}`} fill={entry.fill} />
-                                            ))}
-                                        </Pie>
-                                        <Legend />
-                                    </RechartsPieChart>
-                                </ChartContainer>
-                             ) : (
-                                <div className="h-[250px] flex items-center justify-center text-muted-foreground">No active rota to display.</div>
-                             )}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/>Shift Duties (Last 3 Months)</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                           {quarterlyShiftDistribution.length > 0 ? (
-                               <ChartContainer config={shiftChartConfig} className="h-[250px] w-full">
-                                   <RechartsBarChart data={quarterlyShiftDistribution} accessibilityLayer>
-                                       <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
-                                       <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
-                                       <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                       <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '16px' }} />
-                                        {shifts.map((shift) => (
-                                          <Bar 
-                                            key={shift.id} 
-                                            dataKey={shift.name} 
-                                            stackId="a" 
-                                            fill={shift.color.startsWith('var(') ? shift.color.replace('var(--', 'hsl(var(--').slice(0,-1) : shift.color} 
-                                            radius={4}
-                                          />
-                                        ))}
-                                   </RechartsBarChart>
-                               </ChartContainer>
-                           ) : (
-                               <div className="h-[250px] flex items-center justify-center text-muted-foreground">No duty data from the last 3 months.</div>
-                           )}
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg"><BarChart/> Ad-hoc Duties (Last 3 Months)</CardTitle>
-                        </CardHeader>
-                         <CardContent>
-                             {quarterlyAdhocDuties.length > 0 ? (
-                                <ChartContainer config={{duties: {label: "Duties", color: "hsl(var(--chart-2))"}}} className="h-[250px] w-full">
-                                    <RechartsBarChart data={quarterlyAdhocDuties} accessibilityLayer>
-                                        <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
-                                        <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
-                                        <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
-                                        <Bar dataKey="duties" fill="var(--color-duties)" radius={4} />
-                                    </RechartsBarChart>
-                                </ChartContainer>
-                              ) : (
-                                <div className="h-[250px] flex items-center justify-center text-muted-foreground">No duty data from the last 3 months.</div>
-                              )}
-                        </CardContent>
-                    </Card>
-                </CardContent>
-            </Card>
-        </div>
+        <motion.div
+            className="mb-8"
+            variants={containerVariants}
+            initial="hidden"
+            animate="visible"
+        >
+            <motion.div variants={itemVariants}>
+                <Card className="glass-card overflow-hidden border-border/50">
+                    <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent border-b border-border/50 pb-6">
+                        <CardTitle className="text-2xl">Analytics Dashboard</CardTitle>
+                        <CardDescription>
+                            Visual insights into your team's scheduling metrics.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent className="grid gap-6 sm:grid-cols-1 lg:grid-cols-3 pt-6 p-6">
+                        <motion.div variants={itemVariants} className="h-full">
+                            <Card className="h-full hover:shadow-lg transition-shadow bg-background/50 border-white/5 dark:border-white/10">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg text-primary"><PieChart className="w-5 h-5" /> Active Shift Distribution</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {activeRotaDistribution.length > 0 ? (
+                                        <ChartContainer config={{}} className="h-[250px] w-full">
+                                            <RechartsPieChart>
+                                                <RechartsTooltip content={<ChartTooltipContent hideLabel />} />
+                                                <Pie data={activeRotaDistribution} dataKey="value" nameKey="name" innerRadius={50}>
+                                                    {activeRotaDistribution.map((entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={entry.fill} />
+                                                    ))}
+                                                </Pie>
+                                                <Legend />
+                                            </RechartsPieChart>
+                                        </ChartContainer>
+                                    ) : (
+                                        <div className="h-[250px] flex items-center justify-center text-muted-foreground">No active rota to display.</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                        <motion.div variants={itemVariants} className="h-full">
+                            <Card className="h-full hover:shadow-lg transition-shadow bg-background/50 border-white/5 dark:border-white/10">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg text-primary"><BarChart className="w-5 h-5" />Duties (Last 3 Months)</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {quarterlyShiftDistribution.length > 0 ? (
+                                        <ChartContainer config={shiftChartConfig} className="h-[250px] w-full">
+                                            <RechartsBarChart data={quarterlyShiftDistribution} accessibilityLayer>
+                                                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
+                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                                                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                                <Legend verticalAlign="top" wrapperStyle={{ paddingBottom: '16px' }} />
+                                                {shifts.map((shift) => (
+                                                    <Bar
+                                                        key={shift.id}
+                                                        dataKey={shift.name}
+                                                        stackId="a"
+                                                        fill={shift.color.startsWith('var(') ? shift.color.replace('var(--', 'hsl(var(--').slice(0, -1) : shift.color}
+                                                        radius={4}
+                                                    />
+                                                ))}
+                                            </RechartsBarChart>
+                                        </ChartContainer>
+                                    ) : (
+                                        <div className="h-[250px] flex items-center justify-center text-muted-foreground">No duty data from the last 3 months.</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                        <motion.div variants={itemVariants} className="h-full">
+                            <Card className="h-full hover:shadow-lg transition-shadow bg-background/50 border-white/5 dark:border-white/10">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-lg text-primary"><BarChart className="w-5 h-5" /> Ad-hoc (Last 3 Months)</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {quarterlyAdhocDuties.length > 0 ? (
+                                        <ChartContainer config={{ duties: { label: "Duties", color: "hsl(var(--chart-2))" } }} className="h-[250px] w-full">
+                                            <RechartsBarChart data={quarterlyAdhocDuties} accessibilityLayer>
+                                                <XAxis dataKey="name" tickLine={false} axisLine={false} tickMargin={8} angle={-45} textAnchor="end" height={60} />
+                                                <YAxis tickLine={false} axisLine={false} tickMargin={8} allowDecimals={false} />
+                                                <ChartTooltip cursor={false} content={<ChartTooltipContent />} />
+                                                <Bar dataKey="duties" fill="var(--color-duties)" radius={4} />
+                                            </RechartsBarChart>
+                                        </ChartContainer>
+                                    ) : (
+                                        <div className="h-[250px] flex items-center justify-center text-muted-foreground bg-secondary/20 rounded-xl">No duty data from the last 3 months.</div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </motion.div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+        </motion.div>
     );
 }
 
@@ -233,8 +266,8 @@ function getSwapDetails(gen: RotaGeneration, shiftMap: Map<string, Shift>, membe
     if (!member1 || !member2) return null;
 
     // The shift recorded in assignments is their NEW shift, so the original shifts are swapped
-    const member1OriginalShift = shiftMap.get(gen.assignments[swap.memberId2]);
-    const member2OriginalShift = shiftMap.get(gen.assignments[swap.memberId1]);
+    const member1OriginalShift = shiftMap.get(gen.assignments[swap.memberId2] || '');
+    const member2OriginalShift = shiftMap.get(gen.assignments[swap.memberId1] || '');
 
     if (!member1OriginalShift || !member2OriginalShift) return null;
 
@@ -258,11 +291,11 @@ function getSwapDetails(gen: RotaGeneration, shiftMap: Map<string, Shift>, membe
 function getWeeklyBreakdown(gen: RotaGeneration) {
     const startDate = parseISO(gen.startDate);
     const endDate = parseISO(gen.endDate);
-    
+
     const weeks = [];
     let currentWeekStart = startOfWeek(startDate, { weekStartsOn: 1 });
 
-    while(currentWeekStart <= endDate) {
+    while (currentWeekStart <= endDate) {
         const currentWeekEnd = endOfWeek(currentWeekStart, { weekStartsOn: 1 });
         weeks.push({
             start: currentWeekStart,
@@ -295,7 +328,7 @@ export function RotaMatrix() {
         });
         return Array.from(memberMap.values()).sort((a, b) => a.name.localeCompare(b.name));
     }, [generationHistory]);
-    
+
     const sortedHistory = React.useMemo(() =>
         [...generationHistory].sort((a, b) => parseISO(b.startDate).getTime() - parseISO(a.startDate).getTime()),
         [generationHistory]
@@ -309,24 +342,24 @@ export function RotaMatrix() {
 
     const shiftMap = React.useMemo(() => new Map(shifts.map(s => [s.id, s])), [shifts]);
     const memberMap = React.useMemo(() => new Map(allHistoricalMembers.map(m => [m.id, m])), [allHistoricalMembers]);
-    
-    const activeGeneration = React.useMemo(() => 
+
+    const activeGeneration = React.useMemo(() =>
         generationHistory.find(g => g.id === activeGenerationId)
-    , [generationHistory, activeGenerationId]);
-    
-    const swapHistory = React.useMemo(() => 
+        , [generationHistory, activeGenerationId]);
+
+    const swapHistory = React.useMemo(() =>
         sortedHistory
             .map(gen => {
-                 if (!gen.manualSwaps || gen.manualSwaps.length === 0) return null;
-                 const swap = gen.manualSwaps[0];
-                 const details = getSwapDetails(gen, shiftMap, memberMap);
-                 if (!details) return null;
-                 return { gen, details, swap };
+                if (!gen.manualSwaps || gen.manualSwaps.length === 0) return null;
+                const swap = gen.manualSwaps[0];
+                const details = getSwapDetails(gen, shiftMap, memberMap);
+                if (!details) return null;
+                return { gen, details, swap };
             })
             .filter((item): item is NonNullable<typeof item> => item !== null),
         [sortedHistory, shiftMap, memberMap]
     );
-    
+
     const weekendSwapHistory = React.useMemo(() =>
         sortedHistory
             .map(gen => {
@@ -344,10 +377,10 @@ export function RotaMatrix() {
                 };
             })
             .filter((item): item is NonNullable<typeof item> => item !== null),
-    [sortedHistory, memberMap]);
+        [sortedHistory, memberMap]);
 
     const matrixHeaders = React.useMemo(() => {
-        const headers: {label: string, genId: string, weekIndex: number, isLastInGroup: boolean, weekInterval: {start: Date, end: Date}}[] = [];
+        const headers: { label: string, genId: string, weekIndex: number, isLastInGroup: boolean, weekInterval: { start: Date, end: Date } }[] = [];
         paginatedHistory.forEach((gen, genIndex) => {
             const weeks = getWeeklyBreakdown(gen);
             weeks.forEach((week, weekIndex) => {
@@ -414,8 +447,8 @@ export function RotaMatrix() {
             return;
         }
 
-        const allWeeksHeaders: {label: string, genId: string, weekIndex: number}[] = [];
-         sortedHistory.forEach((gen) => {
+        const allWeeksHeaders: { label: string, genId: string, weekIndex: number }[] = [];
+        sortedHistory.forEach((gen) => {
             const weeks = getWeeklyBreakdown(gen);
             weeks.forEach((week) => {
                 allWeeksHeaders.push({
@@ -429,23 +462,23 @@ export function RotaMatrix() {
 
         const header = ["Member", ...allWeeksHeaders.map(h => h.label)];
         const noteHeader = ["Member", ...allWeeksHeaders.map(h => `${h.label} (Note)`)];
-        
+
         const dutyRows: (string | boolean)[][] = [];
         const noteRows: string[][] = [];
 
         allHistoricalMembers.forEach(member => {
             const dutyRow = [member.name];
             const noteRow = [member.name];
-            
+
             allWeeksHeaders.forEach(headerInfo => {
                 const gen = sortedHistory.find(g => g.id === headerInfo.genId);
                 const isOnAdhoc = gen?.adhoc?.[member.id]?.[headerInfo.weekIndex] ?? false;
                 const note = gen?.comments?.[member.id] ?? "";
-                
+
                 dutyRow.push(isOnAdhoc ? "On Duty" : "");
                 noteRow.push(isOnAdhoc ? note : "");
             });
-            
+
             dutyRows.push(dutyRow);
             noteRows.push(noteRow);
         });
@@ -453,13 +486,13 @@ export function RotaMatrix() {
         const combinedHeader = ["Member", ...allWeeksHeaders.map(h => [h.label, `${h.label} (Note)`]).flat()];
         const combinedRows = allHistoricalMembers.map(member => {
             const rowData = [member.name];
-             allWeeksHeaders.forEach(headerInfo => {
-                 const gen = sortedHistory.find(g => g.id === headerInfo.genId);
-                 const isOnAdhoc = gen?.adhoc?.[member.id]?.[headerInfo.weekIndex] ?? false;
-                 const note = gen?.comments?.[member.id] ?? "";
-                 rowData.push(isOnAdhoc ? "On Duty" : "");
-                 rowData.push(note);
-             });
+            allWeeksHeaders.forEach(headerInfo => {
+                const gen = sortedHistory.find(g => g.id === headerInfo.genId);
+                const isOnAdhoc = gen?.adhoc?.[member.id]?.[headerInfo.weekIndex] ?? false;
+                const note = gen?.comments?.[member.id] ?? "";
+                rowData.push(isOnAdhoc ? "On Duty" : "");
+                rowData.push(note);
+            });
             return rowData;
         });
 
@@ -479,8 +512,8 @@ export function RotaMatrix() {
             });
             return;
         }
-        
-        const sortedWeekendRotas = [...weekendRotas].sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+
+        const sortedWeekendRotas = [...weekendRotas].sort((a, b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
 
         const header = ["Weekend Start", "Assigned Member"];
         const rows = sortedWeekendRotas.map(rota => {
@@ -496,7 +529,7 @@ export function RotaMatrix() {
     };
 
     const handleLeaveExport = () => {
-        const allWeeksHeaders: {label: string, weekInterval: {start: Date, end: Date}}[] = [];
+        const allWeeksHeaders: { label: string, weekInterval: { start: Date, end: Date } }[] = [];
         sortedHistory.forEach((gen) => {
             const weeks = getWeeklyBreakdown(gen);
             weeks.forEach((week) => {
@@ -520,7 +553,7 @@ export function RotaMatrix() {
                 const leaveInterval = { start: parseISO(l.startDate), end: parseISO(l.endDate) };
                 const leaveDays = eachDayOfInterval(leaveInterval);
                 const onLeaveInWeek = leaveDays.some(leaveDay => weekDays.some(weekDay => isSameDay(leaveDay, weekDay)));
-                if(onLeaveInWeek) {
+                if (onLeaveInWeek) {
                     membersOnLeaveThisWeek.add(l.memberId);
                 }
             });
@@ -530,7 +563,7 @@ export function RotaMatrix() {
         downloadCsv([header, ...rows], "leave-matrix-history.csv");
         toast({ title: "Export Successful", description: "The leave matrix has been downloaded as a CSV file." });
     };
-    
+
     return (
         <TooltipProvider>
             <AnalyticsDashboard />
@@ -573,15 +606,15 @@ export function RotaMatrix() {
                                             const shift = assignmentId ? shiftMap.get(assignmentId) : null;
                                             const isManuallyChanged = gen.manualOverrides?.includes(member.id);
                                             const isSwapped = gen.manualSwaps?.some(s => s.memberId1 === member.id || s.memberId2 === member.id);
-                                            
+
                                             const wasMemberInTeam = gen.teamMembersAtGeneration?.some(m => m.id === member.id) ?? false;
 
                                             if (!wasMemberInTeam) {
-                                              return (
-                                                <TableCell key={gen.id} className="text-center text-muted-foreground/50 text-xs">
-                                                  Not in team
-                                                </TableCell>
-                                              );
+                                                return (
+                                                    <TableCell key={gen.id} className="text-center text-muted-foreground/50 text-xs">
+                                                        Not in team
+                                                    </TableCell>
+                                                );
                                             }
 
                                             return (
@@ -589,9 +622,9 @@ export function RotaMatrix() {
                                                     {shift ? (
                                                         <Badge
                                                             variant="secondary"
-                                                            style={{ 
+                                                            style={{
                                                                 backgroundColor: shift.color,
-                                                                color: 'hsl(var(--card-foreground))' 
+                                                                color: 'hsl(var(--card-foreground))'
                                                             }}
                                                         >
                                                             {shift.name}
@@ -599,7 +632,7 @@ export function RotaMatrix() {
                                                                 <Tooltip>
                                                                     <TooltipTrigger asChild>
                                                                         <span className="ml-1.5 inline-block">
-                                                                            {isSwapped 
+                                                                            {isSwapped
                                                                                 ? <ArrowRightLeft className="h-3 w-3" />
                                                                                 : <Recycle className="h-3 w-3" />
                                                                             }
@@ -642,14 +675,14 @@ export function RotaMatrix() {
                         <Pagination>
                             <PaginationContent>
                                 <PaginationItem>
-                                    <PaginationFirst 
+                                    <PaginationFirst
                                         onClick={() => setCurrentPage(0)}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationPrevious 
-                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))} 
+                                    <PaginationPrevious
+                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
@@ -659,13 +692,13 @@ export function RotaMatrix() {
                                     </span>
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationNext 
+                                    <PaginationNext
                                         onClick={() => setCurrentPage(prev => Math.min(pageCount - 1, prev + 1))}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationLast 
+                                    <PaginationLast
                                         onClick={() => setCurrentPage(pageCount - 1)}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
@@ -677,26 +710,26 @@ export function RotaMatrix() {
             </Card>
 
             <Card className="mt-6">
-                 <CardHeader className="flex-row items-center justify-between">
+                <CardHeader className="flex-row items-center justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2"><LifeBuoy /> Ad-hoc Support Matrix</CardTitle>
                         <CardDescription>
                             Historical view of weekly ad-hoc support assignments and notes.
                         </CardDescription>
                     </div>
-                     <Button variant="outline" onClick={handleSupportExport} disabled={generationHistory.length === 0}>
+                    <Button variant="outline" onClick={handleSupportExport} disabled={generationHistory.length === 0}>
                         <Download /> Export as CSV
                     </Button>
                 </CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto rounded-lg border">
                         <Table>
-                             <TableHeader>
+                            <TableHeader>
                                 <TableRow>
                                     <TableHead className="font-semibold sticky left-0 bg-card z-10 min-w-[120px]">Member</TableHead>
-                                     {matrixHeaders.map(header => (
-                                        <TableHead 
-                                            key={`${header.genId}-${header.weekIndex}`} 
+                                    {matrixHeaders.map(header => (
+                                        <TableHead
+                                            key={`${header.genId}-${header.weekIndex}`}
                                             className={cn(
                                                 "text-center font-semibold whitespace-nowrap p-2",
                                                 header.isLastInGroup && "border-r-2 border-border"
@@ -707,8 +740,8 @@ export function RotaMatrix() {
                                     ))}
                                 </TableRow>
                             </TableHeader>
-                             <TableBody>
-                                 {allHistoricalMembers.map(member => (
+                            <TableBody>
+                                {allHistoricalMembers.map(member => (
                                     <TableRow key={member.id}>
                                         <TableCell className="font-medium sticky left-0 bg-card z-10">{member.name}</TableCell>
                                         {matrixHeaders.map(header => {
@@ -720,21 +753,21 @@ export function RotaMatrix() {
                                             const note = adhocNotes[member.id];
 
                                             return (
-                                                <TableCell 
-                                                    key={`${header.genId}-${header.weekIndex}`} 
+                                                <TableCell
+                                                    key={`${header.genId}-${header.weekIndex}`}
                                                     className={cn(
                                                         "text-center text-xs p-2",
                                                         header.isLastInGroup && "border-r-2 border-border"
                                                     )}
                                                 >
-                                                   {isOnAdhoc ? (
-                                                       <Tooltip>
-                                                          <TooltipTrigger asChild>
-                                                            <Badge>{note ? "Note" : "On Duty"}</Badge>
-                                                          </TooltipTrigger>
-                                                          {note && <TooltipContent><p>{note}</p></TooltipContent>}
+                                                    {isOnAdhoc ? (
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <Badge>{note ? "Note" : "On Duty"}</Badge>
+                                                            </TooltipTrigger>
+                                                            {note && <TooltipContent><p>{note}</p></TooltipContent>}
                                                         </Tooltip>
-                                                   ) : <span className="text-muted-foreground">-</span>}
+                                                    ) : <span className="text-muted-foreground">-</span>}
                                                 </TableCell>
                                             )
                                         })}
@@ -751,19 +784,19 @@ export function RotaMatrix() {
                         </Table>
                     </div>
                 </CardContent>
-                 {pageCount > 1 && (
+                {pageCount > 1 && (
                     <CardFooter>
-                       <Pagination>
+                        <Pagination>
                             <PaginationContent>
                                 <PaginationItem>
-                                    <PaginationFirst 
+                                    <PaginationFirst
                                         onClick={() => setCurrentPage(0)}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationPrevious 
-                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))} 
+                                    <PaginationPrevious
+                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
@@ -773,13 +806,13 @@ export function RotaMatrix() {
                                     </span>
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationNext 
+                                    <PaginationNext
                                         onClick={() => setCurrentPage(prev => Math.min(pageCount - 1, prev + 1))}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationLast 
+                                    <PaginationLast
                                         onClick={() => setCurrentPage(pageCount - 1)}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
@@ -862,17 +895,17 @@ export function RotaMatrix() {
                 </CardContent>
                 {pageCount > 1 && (
                     <CardFooter>
-                       <Pagination>
+                        <Pagination>
                             <PaginationContent>
                                 <PaginationItem>
-                                    <PaginationFirst 
+                                    <PaginationFirst
                                         onClick={() => setCurrentPage(0)}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationPrevious 
-                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))} 
+                                    <PaginationPrevious
+                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
@@ -882,13 +915,13 @@ export function RotaMatrix() {
                                     </span>
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationNext 
+                                    <PaginationNext
                                         onClick={() => setCurrentPage(prev => Math.min(pageCount - 1, prev + 1))}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationLast 
+                                    <PaginationLast
                                         onClick={() => setCurrentPage(pageCount - 1)}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
@@ -900,7 +933,7 @@ export function RotaMatrix() {
             </Card>
 
             <Card className="mt-6">
-                <CardHeader  className="flex-row items-center justify-between">
+                <CardHeader className="flex-row items-center justify-between">
                     <div>
                         <CardTitle className="flex items-center gap-2"><CalendarDays /> Weekend Rota Matrix</CardTitle>
                         <CardDescription>
@@ -954,19 +987,19 @@ export function RotaMatrix() {
                         </Table>
                     </div>
                 </CardContent>
-                 {pageCount > 1 && (
+                {pageCount > 1 && (
                     <CardFooter>
-                       <Pagination>
+                        <Pagination>
                             <PaginationContent>
                                 <PaginationItem>
-                                    <PaginationFirst 
+                                    <PaginationFirst
                                         onClick={() => setCurrentPage(0)}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationPrevious 
-                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))} 
+                                    <PaginationPrevious
+                                        onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
                                         className={cn("cursor-pointer", currentPage === 0 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
@@ -976,13 +1009,13 @@ export function RotaMatrix() {
                                     </span>
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationNext 
+                                    <PaginationNext
                                         onClick={() => setCurrentPage(prev => Math.min(pageCount - 1, prev + 1))}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
                                 </PaginationItem>
                                 <PaginationItem>
-                                    <PaginationLast 
+                                    <PaginationLast
                                         onClick={() => setCurrentPage(pageCount - 1)}
                                         className={cn("cursor-pointer", currentPage === pageCount - 1 && "pointer-events-none opacity-50")}
                                     />
@@ -993,7 +1026,7 @@ export function RotaMatrix() {
                 )}
             </Card>
 
-             {swapHistory.length > 0 && (
+            {swapHistory.length > 0 && (
                 <Card className="mt-6">
                     <CardHeader>
                         <CardTitle>Manual Swap History</CardTitle>
@@ -1002,7 +1035,7 @@ export function RotaMatrix() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                         <div className="overflow-x-auto rounded-lg border">
+                        <div className="overflow-x-auto rounded-lg border">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -1019,8 +1052,8 @@ export function RotaMatrix() {
                                         const endDate = parseISO(gen.endDate);
                                         const member1Id = gen.manualSwaps![0].memberId1;
                                         const member2Id = gen.manualSwaps![0].memberId2;
-                                        const shift1 = shiftMap.get(gen.assignments[member2Id])?.name || 'N/A';
-                                        const shift2 = shiftMap.get(gen.assignments[member1Id])?.name || 'N/A';
+                                        const shift1 = shiftMap.get(gen.assignments[member2Id] || '')?.name || 'N/A';
+                                        const shift2 = shiftMap.get(gen.assignments[member1Id] || '')?.name || 'N/A';
 
                                         const canCancel = React.useMemo(() => {
                                             if (!activeGeneration || !details) return false;
@@ -1033,7 +1066,7 @@ export function RotaMatrix() {
                                             if (!activeGeneration || !details) return;
                                             swapShifts(details.memberId1, details.memberId2, activeGeneration.id);
                                             toggleSwapNeutralization(gen.id, details.memberId1, details.memberId2);
-                                            
+
                                             const actionText = swap.neutralized ? "reset" : "canceled out";
                                             toast({
                                                 title: `Swap ${actionText}`,
@@ -1059,7 +1092,7 @@ export function RotaMatrix() {
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <div>
-                                                                <Button 
+                                                                <Button
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     disabled={!canCancel}
@@ -1075,7 +1108,7 @@ export function RotaMatrix() {
                                                             {canCancel ? (
                                                                 <p>{swap.neutralized ? "Reset this canceled swap" : "Cancel out this swap"}</p>
                                                             ) : (
-                                                                <p>To cancel out, the active rota must have <br/> an opposing swap opportunity.</p>
+                                                                <p>To cancel out, the active rota must have <br /> an opposing swap opportunity.</p>
                                                             )}
                                                         </TooltipContent>
                                                     </Tooltip>
@@ -1099,7 +1132,7 @@ export function RotaMatrix() {
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
-                         <div className="overflow-x-auto rounded-lg border">
+                        <div className="overflow-x-auto rounded-lg border">
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -1117,7 +1150,7 @@ export function RotaMatrix() {
                                             if (!activeGeneration) return;
                                             swapWeekendAssignments(activeGeneration.id, memberId1, memberId2);
                                             toggleWeekendSwapNeutralization(gen.id, memberId1, memberId2);
-                                            
+
                                             const actionText = swap.neutralized ? "reset" : "canceled out";
                                             toast({
                                                 title: `Weekend Swap ${actionText}`,
@@ -1135,7 +1168,7 @@ export function RotaMatrix() {
                                                     <Tooltip>
                                                         <TooltipTrigger asChild>
                                                             <div>
-                                                                <Button 
+                                                                <Button
                                                                     variant="ghost"
                                                                     size="icon"
                                                                     onClick={handleWeekendSwapAction}
@@ -1164,7 +1197,7 @@ export function RotaMatrix() {
     )
 }
 
-    
 
-    
+
+
 

@@ -1,377 +1,656 @@
-
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { useRotaStore, useRotaStoreActions } from "@/lib/store";
-import { useAuthStore } from "@/lib/auth-store";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
+    Clock, MapPin, Calendar as CalendarIcon, CheckCircle2, History, Timer,
+    ArrowUpRight, ArrowDownLeft, Loader2, Home, Building2, ShieldCheck,
+    AlertTriangle, Filter, ClipboardList, CheckSquare, XCircle, Users
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, CheckCircle, LogIn, LogOut, MapPin, Home, Briefcase, CalendarClock, Clock, UserCheck, Plane, Coffee } from "lucide-react";
-import { getDistance } from "@/lib/utils";
+import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import { format, parseISO, isToday, endOfDay, intervalToDuration, formatDuration, isWithinInterval } from "date-fns";
-import type { AttendanceLog } from "@/lib/types";
-
-type GeolocationState = {
-    loading: boolean;
-    error: GeolocationPositionError | null;
-    position: GeolocationPosition | null;
-};
-
-type AttendanceType = 'wfo' | 'wfh';
-
-function formatIndividualDuration(start: string, end: string | undefined): string {
-    if (!end) {
-        return "In Progress";
-    }
-    const duration = intervalToDuration({
-        start: parseISO(start),
-        end: parseISO(end),
-    });
-
-    const parts = [];
-    if (duration.hours) parts.push(`${duration.hours}h`);
-    if (duration.minutes) parts.push(`${duration.minutes}m`);
-    
-    return parts.length > 0 ? parts.join(' ') : '0m';
-}
-
-function calculateTotalDurationForDay(logs: AttendanceLog[]): string {
-    const totalSeconds = logs.reduce((acc, log) => {
-        if (log.logoutTime) {
-            const start = parseISO(log.loginTime);
-            const end = parseISO(log.logoutTime);
-            const durationInSeconds = (end.getTime() - start.getTime()) / 1000;
-            return acc + durationInSeconds;
-        }
-        return acc;
-    }, 0);
-
-    if (totalSeconds === 0) {
-        const hasInProgress = logs.some(log => !log.logoutTime);
-        if (hasInProgress && logs.length > 0) {
-            return 'In Progress';
-        }
-        return '0m';
-    }
-    
-    const duration = intervalToDuration({ start: 0, end: totalSeconds * 1000 });
-    
-    const parts = [];
-    if (duration.hours) parts.push(`${duration.hours}h`);
-    if (duration.minutes) parts.push(`${duration.minutes}m`);
-    
-    return parts.length > 0 ? parts.join(' ') : '0m';
-}
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { format, startOfDay, endOfDay } from "date-fns";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useSession } from "next-auth/react";
+import { Role } from "@prisma/client";
 
 export default function AttendancePage() {
-    const { user } = useAuthStore();
-    const { geolocation: geoConfig, attendance, activeGenerationId, generationHistory, shifts, leave } = useRotaStore();
-    const { logAttendance } = useRotaStoreActions();
+    const { data: session } = useSession();
     const { toast } = useToast();
+    const [isLoading, setIsLoading] = useState(true);
+    const [isActionLoading, setIsActionLoading] = useState(false);
+    const [isClockedIn, setIsClockedIn] = useState(false);
+    const [isWfh, setIsWfh] = useState(false);
+    const [elapsedTime, setElapsedTime] = useState("00:00:00");
+    const [startTime, setStartTime] = useState<Date | null>(null);
+    const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+    const [logs, setLogs] = useState<any[]>([]);
+    const [metrics, setMetrics] = useState<any>(null);
+    const [settings, setSettings] = useState<any>(null);
+    const [geoStatus, setGeoStatus] = useState<"valid" | "invalid" | "checking" | "error">("checking");
+    const [requests, setRequests] = useState<any[]>([]);
+    const [teamLogs, setTeamLogs] = useState<any[]>([]);
+    const [approvalsPending, setApprovalsPending] = useState<any[]>([]);
 
-    const [attendanceType, setAttendanceType] = useState<AttendanceType>('wfh');
-    const [locationState, setLocationState] = useState<GeolocationState>({
-        loading: true,
-        error: null,
-        position: null,
-    });
-    
-    const activeGeneration = React.useMemo(() => 
-        generationHistory.find(g => g.id === activeGenerationId)
-    , [generationHistory, activeGenerationId]);
+    const watchId = useRef<number | null>(null);
 
-    const shiftMap = React.useMemo(() => new Map(shifts.map(s => [s.id, s])), [shifts]);
-    
-    const currentShift = React.useMemo(() => {
-        if (!user || !activeGeneration) return null;
-        const shiftId = activeGeneration.assignments[user.uid];
-        return shiftId ? shiftMap.get(shiftId) : null;
-    }, [user, activeGeneration, shiftMap]);
+    const isPrivileged = session?.user?.role === "ADMIN" || session?.user?.role === "HR" || session?.user?.role === "PM";
 
-    const isUserOnLeaveToday = React.useMemo(() => {
-        if (!user) return false;
-        const today = new Date();
-        return leave.some(l => 
-            l.memberId === user.uid && 
-            isWithinInterval(today, { start: parseISO(l.startDate), end: parseISO(l.endDate) })
-        );
-    }, [user, leave]);
+    const fetchSettings = useCallback(async () => {
+        try {
+            const res = await fetch("/api/attendance/settings");
+            if (res.ok) setSettings(await res.json());
+        } catch (e) { }
+    }, []);
 
-    const activeLog = attendance.find(log => log.userId === user?.uid && !log.logoutTime);
-    
-    const userAttendanceHistoryGrouped = React.useMemo(() => {
-        const grouped: Record<string, AttendanceLog[]> = {};
-        attendance
-            .filter(log => log.userId === user?.uid)
-            .sort((a,b) => parseISO(b.loginTime).getTime() - parseISO(a.loginTime).getTime())
-            .forEach(log => {
-                const dateKey = format(parseISO(log.loginTime), 'yyyy-MM-dd');
-                if (!grouped[dateKey]) {
-                    grouped[dateKey] = [];
+    const fetchData = useCallback(async (date: Date) => {
+        setIsLoading(true);
+        try {
+            const startDate = startOfDay(date).toISOString();
+            const endDate = endOfDay(date).toISOString();
+            const response = await fetch(`/api/attendance?startDate=${startDate}&endDate=${endDate}`);
+            const data = await response.json();
+
+            if (data.logs) {
+                setLogs(data.logs);
+                setMetrics(data.metrics);
+
+                const activeLog = data.logs.find((l: any) => !l.logoutTime);
+                if (activeLog) {
+                    setIsClockedIn(true);
+                    setStartTime(new Date(activeLog.loginTime));
+                    setIsWfh(activeLog.isWfh);
+                } else {
+                    setIsClockedIn(false);
+                    setStartTime(null);
                 }
-                grouped[dateKey].push(log);
-            });
-        return grouped;
-    }, [attendance, user?.uid]);
-    
-    const isStaleSession = activeLog ? !isToday(parseISO(activeLog.loginTime)) : false;
+            }
 
-    const distance = locationState.position
-        ? getDistance(
-            locationState.position.coords.latitude,
-            locationState.position.coords.longitude,
-            geoConfig.officeLatitude,
-            geoConfig.officeLongitude
-        )
-        : null;
+            // Fetch requests
+            const reqRes = await fetch("/api/attendance/requests");
+            if (reqRes.ok) {
+                const reqData = await reqRes.json();
+                setRequests(reqData.filter((r: any) => r.userId === session?.user?.id));
+                if (isPrivileged) {
+                    setApprovalsPending(reqData.filter((r: any) => r.status === "PENDING" && r.userId !== session?.user?.id));
+                }
+            }
 
-    const isInRange = distance !== null && distance <= geoConfig.radius;
+            if (isPrivileged) {
+                const teamRes = await fetch("/api/attendance?team=true");
+                if (teamRes.ok) {
+                    const teamData = await teamRes.json();
+                    setTeamLogs(teamData.logs);
+                }
+            }
 
-    const canClockIn = !activeLog && !isStaleSession && !isUserOnLeaveToday;
-    const canClockOut = !!activeLog && !isStaleSession;
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setIsLoading(false);
+        }
+    }, [session, isPrivileged]);
 
     useEffect(() => {
-        if (!navigator.geolocation) {
-            setLocationState({ loading: false, error: { code: 0, message: "Geolocation is not supported by this browser.", PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 }, position: null });
-            setAttendanceType('wfh');
-            return;
-        }
-        
-        setLocationState(prev => ({...prev, loading: true }));
-        const watchId = navigator.geolocation.watchPosition(
-            (pos) => {
-                setLocationState({ loading: false, error: null, position: pos });
-                const currentDistance = getDistance(
-                    pos.coords.latitude, pos.coords.longitude,
-                    geoConfig.officeLatitude, geoConfig.officeLongitude
+        fetchSettings();
+        fetchData(selectedDate);
+    }, [selectedDate, fetchData, fetchSettings]);
+
+    // Timer logic
+    useEffect(() => {
+        let interval: any;
+        if (isClockedIn && startTime) {
+            interval = setInterval(() => {
+                const diff = new Date().getTime() - startTime.getTime();
+                const hours = Math.floor(diff / 3600000);
+                const minutes = Math.floor((diff % 3600000) / 60000);
+                const seconds = Math.floor((diff % 60000) / 1000);
+                setElapsedTime(
+                    `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
                 );
-                const isNowInRange = currentDistance <= geoConfig.radius;
+            }, 1000);
+        } else {
+            setElapsedTime("00:00:00");
+        }
+        return () => clearInterval(interval);
+    }, [isClockedIn, startTime]);
 
-                const currentActiveLog = useRotaStore.getState().attendance.find(log => log.userId === useAuthStore.getState().user?.uid && !log.logoutTime);
+    // Geofencing verification
+    const checkGeofence = useCallback((lat: number, lng: number) => {
+        if (!settings || isWfh) return setGeoStatus("valid");
 
-                if (currentActiveLog && !currentActiveLog.isWfh && !isNowInRange) {
-                    logAttendance(useAuthStore.getState().user!.uid, undefined, false);
-                    toast({
-                        variant: "destructive",
-                        title: "Auto Clock-Out",
-                        description: "You have been automatically clocked out for moving out of the office range.",
-                    });
-                }
-            },
-            (err) => {
-                setLocationState({ loading: false, error: err, position: null });
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-        );
-
-        return () => navigator.geolocation.clearWatch(watchId);
-    }, [geoConfig, logAttendance, toast, user?.uid]);
+        const dist = getDistance(lat, lng, settings.officeLat, settings.officeLng);
+        if (dist <= settings.allowedRadius) {
+            setGeoStatus("valid");
+        } else {
+            setGeoStatus("invalid");
+            if (isClockedIn) {
+                toast({
+                    title: "Out of Range",
+                    description: "You've moved away from the office. Please stay in range or use WFH mode.",
+                    variant: "destructive"
+                });
+            }
+        }
+    }, [settings, isWfh, isClockedIn, toast]);
 
     useEffect(() => {
-        if (locationState.loading) return;
-        setAttendanceType(isInRange ? 'wfo' : 'wfh');
-    }, [isInRange, locationState.loading]);
+        if ("geolocation" in navigator) {
+            watchId.current = navigator.geolocation.watchPosition(
+                (pos) => { checkGeofence(pos.coords.latitude, pos.coords.longitude); },
+                () => { setGeoStatus("error"); },
+                { enableHighAccuracy: true }
+            );
+        }
+        return () => { if (watchId.current) navigator.geolocation.clearWatch(watchId.current); };
+    }, [checkGeofence]);
 
-
-    const handleClockAction = () => {
-        if (attendanceType === 'wfo' && !locationState.position) {
-            toast({
-                variant: "destructive",
-                title: "Location Error",
-                description: "Could not determine your location for office clock-in.",
-            });
+    const handleClockToggle = async () => {
+        if (!isClockedIn && geoStatus === "invalid" && !isWfh) {
+            toast({ title: "Clock-in Denied", description: "You are not within the office geofence.", variant: "destructive" });
             return;
         }
-        
-        const locationData = attendanceType === 'wfh' ? undefined : {
-            latitude: locationState.position!.coords.latitude,
-            longitude: locationState.position!.coords.longitude,
-        };
-        
-        logAttendance(user!.uid, locationData, attendanceType === 'wfh');
+
+        setIsActionLoading(true);
+        try {
+            if (!isClockedIn) {
+                const pos = await getCurrentPosition();
+                const response = await fetch("/api/attendance", {
+                    method: "POST",
+                    body: JSON.stringify({
+                        loginTime: new Date().toISOString(),
+                        loginLocation: isWfh ? "Remote / Home" : "Corporate Office",
+                        isWfh,
+                        latitude: pos?.coords.latitude,
+                        longitude: pos?.coords.longitude,
+                        accuracy: pos?.coords.accuracy
+                    })
+                });
+                if (response.ok) {
+                    toast({ title: "Clocked In", description: `Active session started as ${isWfh ? 'WFH' : 'Office'}.` });
+                    fetchData(selectedDate);
+                }
+            } else {
+                const activeLog = logs.find(l => !l.logoutTime);
+                if (activeLog) {
+                    const pos = await getCurrentPosition();
+                    const response = await fetch(`/api/attendance/${activeLog.id}`, {
+                        method: "PATCH",
+                        body: JSON.stringify({
+                            logoutTime: new Date().toISOString(),
+                            logoutLocation: isWfh ? "Remote / Home" : "Corporate Office",
+                            latitude: pos?.coords.latitude,
+                            longitude: pos?.coords.longitude,
+                            status: "LOGGED_OUT"
+                        })
+                    });
+                    if (response.ok) {
+                        toast({ title: "Clocked Out", description: "Session ended successfully." });
+                        fetchData(selectedDate);
+                    }
+                }
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Operation failed.", variant: "destructive" });
+        } finally {
+            setIsActionLoading(false);
+        }
     };
 
-    const handleForceClockOut = () => {
-        if (!activeLog) return;
-        const autoLogoutTime = endOfDay(parseISO(activeLog.loginTime)).toISOString();
-        logAttendance(user!.uid, undefined, activeLog.isWfh || false, autoLogoutTime);
-    }
-
     return (
-        <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="p-4 sm:p-6 space-y-6"
-        >
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2"><UserCheck />Attendance</CardTitle>
-                    <CardDescription>Clock in or out for your shift. Your status is automatically determined by your location relative to the office.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {isStaleSession && (
-                        <Alert variant="destructive">
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertTitle>Action Required: Stale Session Detected</AlertTitle>
-                            <AlertDescription className="flex items-center justify-between">
-                                <div>
-                                You forgot to clock out on {format(parseISO(activeLog!.loginTime), 'PPP')}. Please force a clock-out to continue.
-                                </div>
-                                <Button variant="destructive" onClick={handleForceClockOut}>Force Clock Out</Button>
-                            </AlertDescription>
-                        </Alert>
+        <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-700">
+            {/* Header Section */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+                <div>
+                    <h1 className="text-4xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">Attendance Hub</h1>
+                    <p className="text-muted-foreground mt-2 text-lg">Centralize your time tracking, geofencing, and shift management.</p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4">
+                    {/* WFH Toggle */}
+                    <div className="bg-muted/50 p-1.5 rounded-2xl flex items-center gap-1 border border-border/40">
+                        <Button
+                            variant={!isWfh ? "default" : "ghost"}
+                            size="sm"
+                            className="rounded-xl px-4 font-bold"
+                            onClick={() => !isClockedIn && setIsWfh(false)}
+                            disabled={isClockedIn}
+                        >
+                            <Building2 className="h-4 w-4 mr-2" /> Office
+                        </Button>
+                        <Button
+                            variant={isWfh ? "default" : "ghost"}
+                            size="sm"
+                            className="rounded-xl px-4 font-bold"
+                            onClick={() => !isClockedIn && setIsWfh(true)}
+                            disabled={isClockedIn}
+                        >
+                            <Home className="h-4 w-4 mr-2" /> Remote
+                        </Button>
+                    </div>
+
+                    <Popover>
+                        <PopoverTrigger asChild>
+                            <Button variant="outline" className="h-12 px-5 rounded-2xl border-primary/20 bg-background/50 backdrop-blur-md flex items-center gap-3 hover:bg-primary/5 transition-all shadow-sm">
+                                <CalendarIcon className="h-5 w-5 text-primary" />
+                                <span className="font-bold">{format(selectedDate, "EEE, MMM do")}</span>
+                            </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0 rounded-2xl border-none shadow-2xl" align="end">
+                            <input
+                                type="date"
+                                className="p-4 bg-background rounded-2xl outline-none"
+                                value={format(selectedDate, "yyyy-MM-dd")}
+                                onChange={(e) => setSelectedDate(new Date(e.target.value))}
+                            />
+                        </PopoverContent>
+                    </Popover>
+                </div>
+            </div>
+
+            <Tabs defaultValue="my-attendance" className="w-full">
+                <TabsList className="bg-muted/30 p-1 rounded-2xl mb-8 border border-border/40 inline-flex">
+                    <TabsTrigger value="my-attendance" className="rounded-xl px-8 font-bold data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all">My Attendance</TabsTrigger>
+                    <TabsTrigger value="regularization" className="rounded-xl px-8 font-bold data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all">Requests</TabsTrigger>
+                    {isPrivileged && (
+                        <TabsTrigger value="manager" className="rounded-xl px-8 font-bold data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all flex items-center gap-2">
+                            Manager Portal
+                            {approvalsPending.length > 0 && <Badge className="bg-rose-500 hover:bg-rose-500 h-5 px-1.5">{approvalsPending.length}</Badge>}
+                        </TabsTrigger>
                     )}
-                    <div className="grid md:grid-cols-3 gap-6">
-                        <div className="md:col-span-1 space-y-4">
-                             <h3 className="font-semibold">Your Status</h3>
-                            <Card className="bg-muted/50">
-                                <CardContent className="p-6 space-y-4">
-                                    {locationState.loading && <Skeleton className="h-10 w-full" />}
-                                    {locationState.error && (
-                                        <Alert variant="destructive">
-                                            <AlertTriangle className="h-4 w-4" />
-                                            <AlertTitle>Location Error</AlertTitle>
-                                            <AlertDescription>{locationState.error.message}. Defaulting to Work From Home.</AlertDescription>
-                                        </Alert>
-                                    )}
-                                    {distance !== null && !locationState.loading && (
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <MapPin className="h-5 w-5 text-muted-foreground" />
-                                                <span>Distance from office:</span>
+                </TabsList>
+
+                <TabsContent value="my-attendance" className="space-y-8 focus-visible:outline-none">
+                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                        {/* LEFT: Clock Section */}
+                        <div className="lg:col-span-4 space-y-6">
+                            <Card className="overflow-hidden border-none shadow-2xl bg-gradient-to-br from-primary/10 via-background to-background relative group">
+                                <div className={cn(
+                                    "absolute top-0 right-0 h-32 w-32 -mr-8 -mt-8 rounded-full blur-3xl opacity-20 transition-colors duration-1000",
+                                    isClockedIn ? "bg-emerald-500" : "bg-primary"
+                                )} />
+
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Clock className="h-5 w-5" /> Clock Terminal
+                                    </CardTitle>
+                                </CardHeader>
+
+                                <CardContent className="flex flex-col items-center py-12 space-y-8">
+                                    <div className="text-center">
+                                        <div className="text-7xl font-mono font-black tracking-tighter text-foreground tabular-nums">
+                                            {elapsedTime}
+                                        </div>
+                                        <p className="text-sm font-bold text-muted-foreground uppercase tracking-[0.2em] mt-2 opacity-60">Session Elapsed</p>
+                                    </div>
+
+                                    <div className="relative">
+                                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                                            <Button
+                                                onClick={handleClockToggle}
+                                                disabled={isActionLoading}
+                                                className={cn(
+                                                    "h-56 w-56 rounded-full text-3xl font-black border-[12px] shadow-2xl transition-all duration-700 relative z-10",
+                                                    isClockedIn
+                                                        ? "bg-gradient-to-br from-rose-500 to-rose-600 border-rose-100/50 shadow-rose-500/30"
+                                                        : "bg-gradient-to-br from-emerald-500 to-emerald-600 border-emerald-100/50 shadow-emerald-500/30"
+                                                )}
+                                            >
+                                                {isActionLoading ? <Loader2 className="h-10 w-10 animate-spin" /> : (isClockedIn ? "OUT" : "IN")}
+                                            </Button>
+                                        </motion.div>
+                                        {isClockedIn && (
+                                            <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
+                                        )}
+                                    </div>
+
+                                    <div className="flex flex-col items-center gap-3">
+                                        {isWfh ? (
+                                            <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 px-4 py-1.5 rounded-full flex items-center gap-2">
+                                                <Home className="h-3 w-3" /> WFH Mode Active
+                                            </Badge>
+                                        ) : (
+                                            <div className={cn(
+                                                "flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all font-bold text-xs uppercase tracking-wider",
+                                                geoStatus === "valid" ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" :
+                                                    geoStatus === "invalid" ? "bg-rose-500/10 text-rose-600 border-rose-200" :
+                                                        "bg-amber-500/10 text-amber-600 border-amber-200"
+                                            )}>
+                                                {geoStatus === "valid" ? <ShieldCheck className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                                                {geoStatus === "valid" ? "Inside Geofence" : geoStatus === "invalid" ? "Outside Range" : "Validating Location..."}
                                             </div>
-                                            <span className={`font-bold ${isInRange ? "text-green-600" : "text-destructive"}`}>
-                                                {distance.toFixed(0)} meters
-                                            </span>
+                                        )}
+                                        <p className="text-xs text-muted-foreground flex items-center gap-1 font-medium italic">
+                                            <MapPin className="h-3 w-3" /> Mumbai, Corporate HQ
+                                        </p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <Card className="p-4 bg-muted/20 border-none">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-50 tracking-widest">Entry</p>
+                                    <p className="text-xl font-bold mt-1 tabular-nums">{startTime ? format(startTime, "HH:mm") : '--:--'}</p>
+                                </Card>
+                                <Card className="p-4 bg-muted/20 border-none">
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-50 tracking-widest">Target Remaining</p>
+                                    <p className="text-xl font-bold mt-1 tabular-nums">7h 42m</p>
+                                </Card>
+                            </div>
+                        </div>
+
+                        {/* RIGHT: Dashboard metrics */}
+                        <div className="lg:col-span-8 space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <Card className="border-none shadow-xl bg-primary text-primary-foreground relative overflow-hidden h-40 flex items-center">
+                                    <div className="absolute right-0 bottom-0 opacity-10 -mr-6 -mb-6">
+                                        <Timer className="h-32 w-32" />
+                                    </div>
+                                    <CardContent className="pt-6">
+                                        <p className="text-sm font-bold opacity-80 uppercase tracking-widest">Weekly Total</p>
+                                        <h3 className="text-4xl font-black mt-2 tabular-nums">{metrics?.weeklyTotal || "0h 0m"}</h3>
+                                        <div className="flex items-center gap-3 mt-4">
+                                            <div className="h-1.5 flex-1 bg-white/20 rounded-full overflow-hidden">
+                                                <div className="h-full bg-white transition-all duration-1000" style={{ width: `${metrics?.targetPercentage || 0}%` }} />
+                                            </div>
+                                            <span className="text-xs font-black">{metrics?.targetPercentage || 0}%</span>
                                         </div>
-                                    )}
-                                    <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            {attendanceType === 'wfh' ? <Home className="h-5 w-5 text-primary"/> : <Briefcase className="h-5 w-5 text-primary"/>}
-                                            <span>Work Status:</span>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="border-none shadow-xl bg-emerald-500 text-white relative overflow-hidden h-40 flex items-center">
+                                    <div className="absolute right-0 bottom-0 opacity-10 -mr-6 -mb-6">
+                                        <CheckCircle2 className="h-32 w-32" />
+                                    </div>
+                                    <CardContent className="pt-6">
+                                        <p className="text-sm font-bold opacity-80 uppercase tracking-widest">Attendance Score</p>
+                                        <h3 className="text-4xl font-black mt-2">{metrics?.attendanceScore || "0%"}</h3>
+                                        <p className="text-xs font-bold mt-4 opacity-80">Excellent performance!</p>
+                                    </CardContent>
+                                </Card>
+
+                                <Card className="border-none shadow-xl bg-muted/50 dark:bg-muted/10 relative overflow-hidden h-40 flex items-center">
+                                    <div className="absolute right-0 bottom-0 opacity-10 -mr-6 -mb-6">
+                                        <History className="h-32 w-32" />
+                                    </div>
+                                    <CardContent className="pt-6">
+                                        <p className="text-sm font-bold text-muted-foreground uppercase tracking-widest">Total Days logged</p>
+                                        <h3 className="text-4xl font-black mt-2">{logs.filter(l => !!l.logoutTime).length}</h3>
+                                        <p className="text-xs font-bold text-muted-foreground mt-4 italic">Updated 1m ago</p>
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            <Card className="border-none shadow-2xl bg-background/50 backdrop-blur-md overflow-hidden">
+                                <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 pb-6">
+                                    <div>
+                                        <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Recent History</CardTitle>
+                                        <CardDescription>Daily clock-in/out records</CardDescription>
+                                    </div>
+                                    <Button variant="outline" size="sm" className="rounded-xl font-bold"><Filter className="h-3 w-3 mr-2" /> Filter Logs</Button>
+                                </CardHeader>
+                                <CardContent className="p-0">
+                                    <ScrollArea className="h-[450px]">
+                                        {logs.length > 0 ? (
+                                            <div className="divide-y divide-border/40">
+                                                {logs.map((log, i) => (
+                                                    <div key={log.id} className="p-6 flex items-center justify-between hover:bg-muted/30 transition-all group">
+                                                        <div className="flex items-center gap-5">
+                                                            <div className={cn(
+                                                                "h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110",
+                                                                log.logoutTime ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
+                                                            )}>
+                                                                {log.logoutTime ? <ArrowUpRight className="h-6 w-6" /> : <ArrowDownLeft className="h-6 w-6" />}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-3">
+                                                                    <p className="text-base font-bold text-foreground">Clock {log.logoutTime ? 'Out' : 'In'}</p>
+                                                                    {log.isWfh && <Badge variant="outline" className="text-[9px] font-black tracking-tighter uppercase h-4 bg-primary/5 text-primary border-primary/20">Remote</Badge>}
+                                                                </div>
+                                                                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mt-1 opacity-70">
+                                                                    <MapPin className="h-3 w-3" /> {log.loginLocation || 'Standard Entry'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                        <div className="text-right">
+                                                            <p className="text-lg font-mono font-black tabular-nums">{format(new Date(log.logoutTime || log.loginTime), "HH:mm:ss")}</p>
+                                                            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 opacity-50">{format(new Date(log.loginTime), "MMM d, yyyy")}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground opacity-40 italic">
+                                                <ClipboardList className="h-12 w-12 mb-2" />
+                                                <p>No activity recorded yet.</p>
+                                            </div>
+                                        )}
+                                    </ScrollArea>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <TabsContent value="regularization" className="space-y-6 focus-visible:outline-none">
+                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                        <div className="lg:col-span-1 space-y-6">
+                            <Card className="border-none shadow-2xl bg-background/80 backdrop-blur-xl">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2"><CheckSquare className="h-5 w-5 text-primary" /> New Request</CardTitle>
+                                    <CardDescription>Submit attendance corrections for missing logs.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <form className="space-y-5" onSubmit={async (e: React.FormEvent<HTMLFormElement>) => {
+                                        e.preventDefault();
+                                        const formData = new FormData(e.currentTarget);
+                                        setIsActionLoading(true);
+                                        try {
+                                            const res = await fetch("/api/attendance/requests", {
+                                                method: "POST",
+                                                body: JSON.stringify({
+                                                    type: formData.get("type"),
+                                                    date: formData.get("date"),
+                                                    reason: formData.get("reason"),
+                                                })
+                                            });
+                                            if (res.ok) {
+                                                toast({ title: "Request Submitted", description: "Your regularization request is pending approval." });
+                                                fetchData(selectedDate);
+                                            }
+                                        } catch (e) {
+                                            toast({ title: "Error", description: "Failed to submit request.", variant: "destructive" });
+                                        } finally {
+                                            setIsActionLoading(false);
+                                        }
+                                    }}>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Type</label>
+                                            <select
+                                                name="type"
+                                                className="w-full h-11 bg-muted/40 border-none rounded-xl px-4 text-sm font-medium focus:ring-2 ring-primary"
+                                            >
+                                                <option value="FULL_DAY">Full Day Regularization</option>
+                                                <option value="CLOCK_IN">Missing Clock In</option>
+                                                <option value="CLOCK_OUT">Missing Clock Out</option>
+                                            </select>
                                         </div>
-                                        <Badge variant={attendanceType === 'wfh' ? "secondary" : "default"}>
-                                            {attendanceType === 'wfh' ? "Work From Home" : "Work From Office"}
-                                        </Badge>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Date</label>
+                                            <Input name="date" type="date" className="h-11 bg-muted/40 border-none rounded-xl font-medium" required />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Reason</label>
+                                            <Textarea name="reason" placeholder="Why was the clock-in missed?" className="bg-muted/40 border-none rounded-xl font-medium resize-none min-h-[100px]" required />
+                                        </div>
+                                        <Button type="submit" disabled={isActionLoading} className="w-full h-12 rounded-2xl font-black text-base shadow-lg shadow-primary/20">Submit Request</Button>
+                                    </form>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <div className="lg:col-span-2">
+                            <Card className="border-none shadow-2xl bg-background/80 backdrop-blur-xl h-full">
+                                <CardHeader>
+                                    <CardTitle>My Past Requests</CardTitle>
+                                    <CardDescription>Status tracking for your regularization submissions.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-0 border-t">
+                                    <div className="divide-y">
+                                        {requests.length > 0 ? requests.map((req, i) => (
+                                            <div key={i} className="p-6 flex items-center justify-between group hover:bg-muted/20">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center text-primary">
+                                                        <CalendarIcon className="h-6 w-6" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-black text-foreground">{req.type}</p>
+                                                        <p className="text-xs text-muted-foreground font-medium">{format(new Date(req.date), "MMMM d, yyyy")}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <Badge className={cn(
+                                                        "rounded-full px-4 h-6 text-[10px] font-black tracking-widest uppercase",
+                                                        req.status === 'APPROVED' ? 'bg-emerald-500 hover:bg-emerald-600' :
+                                                            req.status === 'REJECTED' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'
+                                                    )}>{req.status}</Badge>
+                                                    {req.approver && <p className="text-[10px] text-muted-foreground italic font-medium">By {req.approver.name}</p>}
+                                                </div>
+                                            </div>
+                                        )) : (
+                                            <div className="p-12 text-center opacity-40 italic text-sm">No requests found.</div>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
                         </div>
-                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                           <div className="space-y-4 flex flex-col">
-                               <h3 className="font-semibold">Today's Shift</h3>
-                               <Card className="flex-grow">
-                                   <CardContent className="p-6 flex flex-col justify-center items-center h-full text-center">
-                                       {currentShift ? (
-                                           <>
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="font-semibold text-base mb-2"
-                                                    style={{ 
-                                                        backgroundColor: currentShift.color,
-                                                        color: 'hsl(var(--card-foreground))'
-                                                    }}
-                                                >
-                                                    {currentShift.name}
-                                                </Badge>
-                                                <p className="text-lg font-mono">{currentShift.startTime} - {currentShift.endTime}</p>
-                                           </>
-                                       ) : isUserOnLeaveToday ? (
-                                            <div className="flex flex-col items-center text-muted-foreground">
-                                                <Plane className="h-8 w-8 mb-2" />
-                                                <p className="font-semibold">On Leave</p>
-                                            </div>
-                                       ) : (
-                                            <div className="flex flex-col items-center text-muted-foreground">
-                                                <Coffee className="h-8 w-8 mb-2" />
-                                                <p className="font-semibold">Offline</p>
-                                            </div>
-                                       )}
-                                   </CardContent>
-                               </Card>
-                           </div>
-                            <div className="space-y-4 flex flex-col">
-                                <h3 className="font-semibold">Your Action</h3>
-                                <Card className="h-full flex flex-col justify-center flex-grow">
-                                    <CardContent className="p-6 text-center">
-                                        {activeLog && !isStaleSession ? (
-                                            <div className="space-y-2">
-                                                <p>You clocked in at:</p>
-                                                <p className="font-semibold text-lg">{format(parseISO(activeLog.loginTime), 'PPpp')}</p>
-                                                <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockOut}>
-                                                    <LogOut className="mr-2" /> Clock Out
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                <p>You are currently clocked out.</p>
-                                                <Button size="lg" className="w-full mt-4" onClick={handleClockAction} disabled={!canClockIn || locationState.loading}>
-                                                    <LogIn className="mr-2" /> Clock In as {attendanceType === 'wfh' ? "WFH" : "WFO"}
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            </div>
-                        </div>
                     </div>
-                </CardContent>
-            </Card>
+                </TabsContent>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Your Attendance History</CardTitle>
-                    <CardDescription>A log of your recent clock-in and clock-out times, grouped by day.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="space-y-6">
-                        {Object.keys(userAttendanceHistoryGrouped).length > 0 ? (
-                            Object.entries(userAttendanceHistoryGrouped).map(([date, logs]) => (
-                                <div key={date} className="rounded-lg border">
-                                    <div className="bg-muted/50 px-4 py-3 flex justify-between items-center">
-                                        <h3 className="font-semibold">{format(parseISO(date), 'EEEE, d MMMM yyyy')}</h3>
-                                        <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
-                                            <Clock className="h-4 w-4" />
-                                            <span>Total: {calculateTotalDurationForDay(logs)}</span>
+                {isPrivileged && (
+                    <TabsContent value="manager" className="space-y-8 focus-visible:outline-none">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <Card className="border-none shadow-2xl bg-rose-500 text-white overflow-hidden relative">
+                                <div className="absolute right-0 bottom-0 opacity-10 -mr-10 -mb-10">
+                                    <AlertTriangle className="h-48 w-48" />
+                                </div>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle className="text-3xl font-black">{approvalsPending.length}</CardTitle>
+                                            <CardDescription className="text-white/80 font-bold uppercase tracking-wider mt-1">Pending Approvals</CardDescription>
+                                        </div>
+                                        <div className="h-14 w-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
+                                            <CheckSquare className="h-8 w-8" />
                                         </div>
                                     </div>
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead>Clock In</TableHead>
-                                                <TableHead>Clock Out</TableHead>
-                                                <TableHead>Duration</TableHead>
-                                                <TableHead>Type</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                            {logs.map(log => (
-                                                <TableRow key={log.id}>
-                                                    <TableCell>{format(parseISO(log.loginTime), 'p')}</TableCell>
-                                                    <TableCell>{log.logoutTime ? format(parseISO(log.logoutTime), 'p') : <Badge variant="secondary">In Progress</Badge>}</TableCell>
-                                                    <TableCell className="font-medium">{formatIndividualDuration(log.loginTime, log.logoutTime)}</TableCell>
-                                                    <TableCell>{log.isWfh ? <Badge>WFH</Badge> : <Badge variant="outline">Office</Badge>}</TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm font-medium opacity-90 leading-relaxed mb-4">You have {approvalsPending.length} regularization requests waiting for your signature. Fast approval keeps team metrics accurate.</p>
+                                    <Button variant="secondary" className="w-full rounded-xl font-black uppercase tracking-tight h-12 shadow-inner">View Queue</Button>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-none shadow-2xl bg-indigo-600 text-white overflow-hidden relative">
+                                <div className="absolute right-0 bottom-0 opacity-10 -mr-10 -mb-10">
+                                    <Users className="h-48 w-48" />
                                 </div>
-                            ))
-                        ) : (
-                            <div className="h-24 text-center text-muted-foreground flex items-center justify-center border rounded-lg">
-                                No attendance history found.
-                            </div>
-                        )}
-                    </div>
-                </CardContent>
-            </Card>
-        </motion.div>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle className="text-3xl font-black">12 / 15</CardTitle>
+                                            <CardDescription className="text-white/80 font-bold uppercase tracking-wider mt-1">Team Presence</CardDescription>
+                                        </div>
+                                        <div className="h-14 w-14 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
+                                            <Building2 className="h-8 w-8" />
+                                        </div>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm font-medium opacity-90 leading-relaxed mb-4">80% of your team is currently logged in. 3 team members are working remote today.</p>
+                                    <Button variant="secondary" className="w-full rounded-xl font-black uppercase tracking-tight h-12 shadow-inner">Live Presence Map</Button>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        <Card className="border-none shadow-2xl">
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <div>
+                                    <CardTitle>Team Attendance Logs</CardTitle>
+                                    <CardDescription>Live oversight of all active and past sessions.</CardDescription>
+                                </div>
+                                <Button size="sm" variant="outline" className="rounded-xl font-bold">Export CSV</Button>
+                            </CardHeader>
+                            <CardContent className="p-0 border-t">
+                                <div className="divide-y overflow-auto border-b">
+                                    {teamLogs.length > 0 ? teamLogs.map((log, i) => (
+                                        <div key={i} className="p-6 flex items-center justify-between group hover:bg-muted/10 transition-colors">
+                                            <div className="flex items-center gap-4">
+                                                <div className="h-12 w-12 rounded-full overflow-hidden bg-muted border-2 border-primary/10">
+                                                    <img src={log.user.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${log.user.name}`} alt="" />
+                                                </div>
+                                                <div>
+                                                    <p className="font- black text-base">{log.user.name}</p>
+                                                    <p className="text-xs font-bold text-muted-foreground opacity-60 uppercase tracking-widest">{log.user.role}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-12">
+                                                <div className="text-center hidden md:block">
+                                                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-50 tracking-widest">Login</p>
+                                                    <p className="text-sm font-mono font-bold">{format(new Date(log.loginTime), "HH:mm")}</p>
+                                                </div>
+                                                <div className="text-center hidden md:block">
+                                                    <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-50 tracking-widest">Logout</p>
+                                                    <p className="text-sm font-mono font-bold">{log.logoutTime ? format(new Date(log.logoutTime), "HH:mm") : 'ACTIVE'}</p>
+                                                </div>
+                                                <div className="text-right min-w-[100px]">
+                                                    <Badge className={cn(
+                                                        "rounded-full px-4 h-7 text-[10px] font-black uppercase tracking-widest",
+                                                        !log.logoutTime ? 'bg-emerald-500 animate-pulse' : 'bg-muted text-muted-foreground border-none'
+                                                    )}>{!log.logoutTime ? 'ONLINE' : 'OFFLINE'}</Badge>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )) : (
+                                        <div className="p-24 text-center text-muted-foreground opacity-30 italic">No team activity results.</div>
+                                    )}
+                                </div>
+                                <div className="p-4 bg-muted/20 text-center">
+                                    <Button variant="ghost" className="text-xs font-black text-primary hover:bg-transparent">Show More Records</Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                )}
+            </Tabs>
+        </div>
     );
 }
+
+// Helpers
+function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
+    const R = 6371e3; // meters
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+}
+
+function getCurrentPosition(): Promise<GeolocationPosition> {
+    return new Promise((res, rej) => {
+        navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
+    });
+}
+
