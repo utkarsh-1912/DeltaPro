@@ -1,60 +1,112 @@
+"use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { motion } from "framer-motion";
+import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Gavel, FileCheck, Scale, AlertTriangle, RefreshCcw } from "lucide-react";
 
 export default function TermsPage() {
+  const lastUpdated = new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+
   return (
-    <div className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-      <div className="max-w-3xl mx-auto">
-        <Link href="/" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:underline mb-4">
-          <ArrowLeft className="h-4 w-4" />
-          Back to Home
-        </Link>
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-3xl font-extrabold tracking-tight">Terms of Service & Privacy Policy</CardTitle>
-          </CardHeader>
-          <CardContent className="prose prose-sm sm:prose-base max-w-none text-muted-foreground space-y-6">
-            <p className="text-sm">Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+    <div className="min-h-screen bg-background relative overflow-hidden">
+      {/* Background Orbs */}
+      <div className="absolute top-0 -right-4 w-72 h-72 bg-primary/10 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" />
+      <div className="absolute bottom-0 -left-4 w-72 h-72 bg-purple-500/10 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000" />
 
-            <section>
-              <h2 className="text-xl font-semibold text-foreground">1. Introduction</h2>
-              <p>Welcome to DeltaPro by <Link href="https://utkristi-io.netlify.app" className="text-primary hover:underline">Utkristi.io</Link>. This application is a demonstration project provided "as is" for evaluation and showcase purposes only. By accessing or using our service, you agree to be bound by these Terms of Service and Privacy Policy. If you disagree with any part of the terms, you may not access the service.</p>
-            </section>
+      <div className="container mx-auto px-4 py-20 relative z-10">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-4xl mx-auto"
+        >
+          <Link href="/" className="group inline-flex items-center gap-2 text-sm font-bold text-muted-foreground hover:text-primary transition-colors mb-12">
+            <div className="h-8 w-8 rounded-xl bg-muted/50 flex items-center justify-center group-hover:bg-primary/10 group-hover:text-primary transition-all">
+              <ArrowLeft className="h-4 w-4" />
+            </div>
+            Back to Home
+          </Link>
 
-            <section>
-              <h2 className="text-xl font-semibold text-foreground">2. Terms of Service</h2>
-              <h3 className="text-lg font-semibold text-foreground">2.1. Account Registration</h3>
-              <p>To use the scheduling features of DeltaPro, you must register for an account. You agree to provide accurate, current, and complete information during the registration process and to update such information to keep it accurate, current, and complete. You are responsible for safeguarding your password.</p>
+          <header className="space-y-4 mb-12">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-black uppercase tracking-widest"
+            >
+              <FileCheck className="h-3 w-3" /> Agreement
+            </motion.div>
+            <h1 className="text-5xl font-black tracking-tight leading-none">
+              Terms of <span className="text-primary">Service.</span>
+            </h1>
+            <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs">
+              Last Updated: {lastUpdated}
+            </p>
+          </header>
 
-              <h3 className="text-lg font-semibold text-foreground">2.2. Use of the Service</h3>
-              <p>You agree not to use the Service for any purpose that is illegal or prohibited by these Terms. As this is a demo application, you acknowledge that functionalities may change, and data may be reset or become inaccessible without notice.</p>
-            </section>
+          <Card className="border-none shadow-2xl bg-background/50 backdrop-blur-xl overflow-hidden rounded-[2.5rem]">
+            <CardContent className="p-8 md:p-12 space-y-12">
 
-            <section>
-              <h2 className="text-xl font-semibold text-foreground">3. Privacy Policy</h2>
-              <h3 className="text-lg font-semibold text-foreground">3.1. Information We Collect</h3>
-              <ul className="list-disc pl-5 space-y-1">
-                <li><strong>Account Information:</strong> When you create an account, we collect your name and email address for authentication purposes.</li>
-                <li><strong>User-Generated Content:</strong> We store the data you provide to the application, such as team member names, shift details, rota assignments, and any other configuration data required for the service to function.</li>
-              </ul>
+              <section className="space-y-4">
+                <div className="flex items-center gap-3 text-primary mb-2">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Gavel className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight">System Access</h2>
+                </div>
+                <p className="text-muted-foreground leading-relaxed font-medium">
+                  Welcome to DeltaPro by <Link href="https://utkristi-io.netlify.app" className="text-primary hover:underline">Utkristi.io</Link>. This application is an enterprise-grade demonstration platform. By accessing our services, you agree to comply with our operational framework and security protocols.
+                </p>
+              </section>
 
-              <h3 className="text-lg font-semibold text-foreground">3.2. How We Use Your Information</h3>
-              <p>Your data is used exclusively to provide and operate the features of the DeltaPro application. We do not sell, trade, or otherwise transfer your personally identifiable information or user-generated content to outside parties. We may use your email address to communicate with you about the service if necessary.</p>
-            </section>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="p-6 rounded-3xl bg-muted/30 border border-border/40 space-y-4">
+                  <h3 className="text-lg font-black flex items-center gap-2">
+                    <Scale className="h-4 w-4 text-primary" /> User Obligations
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-medium leading-relaxed">
+                    Account holders are responsible for maintaining the confidentiality of their credentials and for all activities that occur under their administrative instance. Accuracy of workforce data is paramount for the integrity of the scheduling engine.
+                  </p>
+                </div>
 
-            <section>
-              <h2 className="text-xl font-semibold text-foreground">4. Limitation of Liability</h2>
-              <p>In no event shall the creators or providers of DeltaPro be liable for any direct, indirect, incidental, special, or consequential damages (including, but not limited to, loss of data) arising out of, or in any way connected with, the use or inability to use this demonstration service.</p>
-            </section>
+                <div className="p-6 rounded-3xl bg-muted/30 border border-border/40 space-y-4">
+                  <h3 className="text-lg font-black flex items-center gap-2 text-amber-600">
+                    <AlertTriangle className="h-4 w-4" /> Usage Rights
+                  </h3>
+                  <p className="text-sm text-muted-foreground font-medium leading-relaxed">
+                    We reserve the right to modify system functionalities or reset demonstration instances to maintain platform stability. Unauthorized exploitation of platform logic or security is strictly prohibited.
+                  </p>
+                </div>
+              </div>
 
-            <section>
-              <h2 className="text-xl font-semibold text-foreground">5. Changes to Terms</h2>
-              <p>We reserve the right, at our sole discretion, to modify or replace these Terms at any time. We will provide notice of any changes by posting the new Terms on this page.</p>
-            </section>
-          </CardContent>
-        </Card>
+              <section className="space-y-4 pt-4">
+                <div className="flex items-center gap-3 text-foreground mb-2">
+                  <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
+                    <RefreshCcw className="h-5 w-5" />
+                  </div>
+                  <h2 className="text-2xl font-black tracking-tight">Modifications</h2>
+                </div>
+                <p className="text-muted-foreground leading-relaxed font-medium">
+                  DeltaPro is rapidly evolving. We reserve the right to update these terms to reflect new enterprise capabilities or regulatory requirements. Continued use of the platform after updates constitutes acceptance of the refined framework.
+                </p>
+              </section>
+
+              <footer className="pt-8 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                  Enterprise Resilience Framework
+                </p>
+                <div className="flex gap-4">
+                  <Link href="/privacy" className="text-xs font-black uppercase tracking-widest text-emerald-600 hover:underline">
+                    Privacy Policy
+                  </Link>
+                </div>
+              </footer>
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </div>
   );

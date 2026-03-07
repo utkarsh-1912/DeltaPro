@@ -477,9 +477,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               <span className="font-extrabold text-xl tracking-tight">DeltaPro</span>
             </Link>
             <nav className="hidden md:flex items-center gap-8">
-              <Link href="/about" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">About</Link>
-              <Link href="/contact" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">Contact</Link>
-              <div className="h-4 w-px bg-border/60 mx-2" />
               <Button asChild variant="ghost" size="sm" className="font-bold">
                 <Link href="/login">Sign In</Link>
               </Button>
@@ -492,7 +489,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="relative flex-1">{children}</main>
         <footer className="py-12 border-t bg-muted/20 shrink-0">
           <div className="container mx-auto px-4 text-center">
-            <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} Delta<span className="font-bold text-foreground">Pro</span> Enterprise. Built for Excellence.</p>
+            <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                &copy; {new Date().getFullYear()} DeltaLabs by Utkristi.io
+              </p>
+              <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                <Link href="/about" className="hover:text-primary transition-colors">About</Link>
+                <Link href="/contact" className="hover:text-primary transition-colors">Contact</Link>
+                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
+                <Link href="/terms" className="hover:text-primary transition-colors">Terms</Link>
+              </div>
+            </div>
           </div>
         </footer>
       </div>
