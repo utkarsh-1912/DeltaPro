@@ -12,6 +12,14 @@ export async function GET() {
                 project: true,
                 assignee: true,
                 reporter: true,
+                taskComments: {
+                    include: {
+                        user: true
+                    },
+                    orderBy: {
+                        createdAt: 'desc'
+                    }
+                }
             },
             orderBy: {
                 updatedAt: 'desc'

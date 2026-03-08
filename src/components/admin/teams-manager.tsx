@@ -43,7 +43,6 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { useAccessControl } from "@/hooks/use-access-control";
-import { getUserRole } from "@/lib/auth-roles";
 
 const teamSchema = z.object({
   name: z.string().min(2, "Team name must be at least 2 characters long."),
@@ -55,14 +54,13 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
   const { users } = useRotaStore();
   const { toast } = useToast();
   const isEditMode = !!team;
-  
-  const projectManagers = React.useMemo(() => 
+
+  const projectManagers = React.useMemo(() =>
     users.filter(u => {
-        if (!u.email) return false;
-        const role = getUserRole(u.email);
-        return role === 'pm' || role === 'admin';
+      const role = u.role?.toLowerCase();
+      return role === 'pm' || role === 'admin';
     })
-  , [users]);
+    , [users]);
 
   const form = useForm<z.infer<typeof teamSchema>>({
     resolver: zodResolver(teamSchema),
@@ -127,7 +125,7 @@ function TeamForm({ team, setOpen }: { team?: Team; setOpen: (open: boolean) => 
                   </FormControl>
                   <SelectContent>
                     <SelectItem value="none">No PM</SelectItem>
-                     {projectManagers.map(pm => (
+                    {projectManagers.map(pm => (
                       <SelectItem key={pm.id} value={pm.id}>{pm.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -166,18 +164,18 @@ export function TeamsManager() {
       description: `The ${team.name} team has been removed.`,
     });
   };
-  
+
   const memberCounts = React.useMemo(() => {
     const counts: Record<string, number> = {};
     teams.forEach(t => counts[t.id] = 0);
     teamMembers.forEach(m => {
-        if(m.teamId && counts[m.teamId] !== undefined) {
-            counts[m.teamId]++;
-        }
+      if (m.teamId && counts[m.teamId] !== undefined) {
+        counts[m.teamId]++;
+      }
     });
     return counts;
   }, [teams, teamMembers]);
-  
+
   const pmMap = React.useMemo(() => new Map(users.map(u => [u.id, u.name])), [users]);
 
 
@@ -218,13 +216,13 @@ export function TeamsManager() {
                 <TableCell className="text-right">
                   <Dialog open={dialogs[team.id]} onOpenChange={(open) => setDialogOpen(team.id, open)}>
                     <DialogTrigger asChild>
-                       <Button variant="ghost" size="icon">
+                      <Button variant="ghost" size="icon">
                         <Pencil className="h-4 w-4" />
                         <span className="sr-only">Edit Team</span>
                       </Button>
                     </DialogTrigger>
                     <DialogContent>
-                        <TeamForm team={team} setOpen={(open) => setDialogOpen(team.id, open)} />
+                      <TeamForm team={team} setOpen={(open) => setDialogOpen(team.id, open)} />
                     </DialogContent>
                   </Dialog>
 
@@ -254,11 +252,11 @@ export function TeamsManager() {
               </TableRow>
             ))}
             {teams.length === 0 && (
-                <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground">
-                        No teams found.
-                    </TableCell>
-                </TableRow>
+              <TableRow>
+                <TableCell colSpan={4} className="text-center text-muted-foreground">
+                  No teams found.
+                </TableCell>
+              </TableRow>
             )}
           </TableBody>
         </Table>

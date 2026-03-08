@@ -6,7 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -45,6 +45,7 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { Command as CommandPrimitive, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "cmdk";
 
 const SIDEBAR_WIDTH = 260;
 const COLLAPSED_WIDTH = 80;
@@ -70,6 +71,7 @@ function GlobalSearch() {
   const [query, setQuery] = React.useState("");
   const [results, setResults] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(false);
+  const router = useRouter();
 
   React.useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -97,7 +99,6 @@ function GlobalSearch() {
     return () => clearTimeout(timer);
   }, [query]);
 
-  const router = useRouter();
   const getIcon = (category: string) => {
     switch (category) {
       case "Employee": return Users;
@@ -107,6 +108,14 @@ function GlobalSearch() {
       default: return FileText;
     }
   };
+
+  const groupedResults = React.useMemo(() => {
+    return results.reduce((acc: any, item: any) => {
+      if (!acc[item.category]) acc[item.category] = [];
+      acc[item.category].push(item);
+      return acc;
+    }, {});
+  }, [results]);
 
   return (
     <>
@@ -118,73 +127,86 @@ function GlobalSearch() {
           onClick={() => setOpen(true)}
         >
           Search enterprise...
-          <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
+          <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 uppercase">
             <span className="text-xs">⌘</span>K
           </kbd>
         </Button>
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-2xl rounded-2xl bg-background/80 backdrop-blur-xl">
-          <DialogTitle className="sr-only">Global Search</DialogTitle>
-          <DialogHeader className="p-4 border-b bg-muted/20">
-            <div className="flex items-center gap-3">
-              <SearchIcon className="h-5 w-5 text-primary" />
-              <Input
+        <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-3xl rounded-2xl bg-background/95 backdrop-blur-xl mt-[10vh]">
+          <DialogTitle className="sr-only">Enterprise Search</DialogTitle>
+          <DialogDescription className="sr-only">Search across all modules including tasks, projects, employees and workspaces.</DialogDescription>
+          <CommandPrimitive className="flex h-full w-full flex-col overflow-hidden rounded-2xl">
+            <div className="flex items-center border-b px-4 py-4 gap-3">
+              <SearchIcon className="h-5 w-5 text-primary animate-pulse" />
+              <CommandInput
                 placeholder="Search across all modules..."
-                className="border-none focus-visible:ring-0 text-lg bg-transparent p-0"
+                className="flex-1 bg-transparent border-none focus:ring-0 text-lg font-bold outline-none placeholder:text-muted-foreground/30"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                autoFocus
+                onValueChange={setQuery}
               />
+              <div className="px-2 py-0.5 rounded-lg bg-muted text-[10px] font-black tracking-widest uppercase opacity-40 select-none">Esc</div>
             </div>
-          </DialogHeader>
-          <ScrollArea className="h-[400px]">
-            {loading ? (
-              <div className="p-8 text-center text-sm text-muted-foreground">Searching enterprise...</div>
-            ) : query.length > 0 && results.length > 0 ? (
-              <div className="p-4 space-y-4">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-2">Results</p>
-                <div className="space-y-1">
-                  {results.map((item, i) => {
-                    const Icon = getIcon(item.category);
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => { setOpen(false); router.push(item.href); }}
-                        className="w-full flex items-center justify-between p-3 hover:bg-primary/5 rounded-xl group transition-all">
-                        <div className="flex items-center gap-3">
-                          <div className="p-1.5 bg-primary/10 rounded-lg group-hover:bg-primary group-hover:text-primary-foreground transition-all">
-                            <Icon className="h-4 w-4" />
+
+            <CommandList className="max-h-[450px] overflow-y-auto overflow-x-hidden p-2 scrollbar-hide">
+              <CommandEmpty className="py-20 text-center">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="h-16 w-16 bg-muted/20 rounded-full flex items-center justify-center">
+                    <SearchIcon className="h-8 w-8 opacity-20" />
+                  </div>
+                  <p className="text-sm font-black uppercase tracking-widest text-muted-foreground opacity-40">No records found</p>
+                </div>
+              </CommandEmpty>
+
+              {Object.entries(groupedResults).map(([category, items]: [string, any]) => (
+                <CommandGroup
+                  key={category}
+                  heading={category}
+                  className="px-3 pt-6 pb-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 first:pt-2"
+                >
+                  <div className="space-y-1 mt-1">
+                    {items.map((item: any, i: number) => {
+                      const Icon = getIcon(item.category);
+                      return (
+                        <CommandItem
+                          key={i}
+                          onSelect={() => { setOpen(false); router.push(item.href); }}
+                          className="flex items-center justify-between p-3 rounded-xl cursor-pointer hover:bg-primary/5 group transition-all"
+                        >
+                          <div className="flex items-center gap-4">
+                            <div className="h-10 w-10 bg-muted/40 rounded-xl flex items-center justify-center group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-bold text-sm tracking-tight">{item.label}</span>
+                              {item.subLabel && <span className="text-[10px] font-medium text-muted-foreground mt-0.5">{item.subLabel}</span>}
+                            </div>
                           </div>
-                          <div className="flex flex-col items-start">
-                            <span className="font-medium text-sm leading-none">{item.label}</span>
-                            {item.subLabel && <span className="text-xs text-muted-foreground mt-1">{item.subLabel}</span>}
-                          </div>
-                        </div>
-                        <span className="text-xs font-bold text-muted-foreground/60">{item.category}</span>
-                      </button>
-                    )
-                  })}
+                          <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-40 transition-all translate-x-[-10px] group-hover:translate-x-0" />
+                        </CommandItem>
+                      );
+                    })}
+                  </div>
+                </CommandGroup>
+              ))}
+
+              {query.length === 0 && (
+                <div className="p-10 text-center space-y-4">
+                  <div className="px-4 py-2 inline-flex gap-4 bg-muted/20 rounded-2xl border border-dashed">
+                    <div className="flex items-center gap-2">
+                      <kbd className="px-1.5 py-0.5 rounded bg-muted-foreground/10 text-[9px] font-bold">↑↓</kbd>
+                      <span className="text-[9px] font-black uppercase tracking-tighter opacity-40">Navigate</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <kbd className="px-1.5 py-0.5 rounded bg-muted-foreground/10 text-[9px] font-bold">Enter</kbd>
+                      <span className="text-[9px] font-black uppercase tracking-tighter opacity-40">Open</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ) : query.length > 0 ? (
-              <div className="p-12 text-center space-y-4">
-                <p className="font-bold text-lg">No Results Found</p>
-                <p className="text-sm text-muted-foreground">We couldn't find anything matching "{query}".</p>
-              </div>
-            ) : (
-              <div className="p-12 text-center space-y-4">
-                <div className="h-16 w-16 bg-primary/5 rounded-full flex items-center justify-center mx-auto">
-                  <SearchIcon className="h-8 w-8 text-primary/40" />
-                </div>
-                <div>
-                  <p className="font-bold text-lg">Global Enterprise Search</p>
-                  <p className="text-sm text-muted-foreground">Search for projects, tasks, employees, or documents across the entire platform.</p>
-                </div>
-              </div>
-            )}
-          </ScrollArea>
+              )}
+            </CommandList>
+          </CommandPrimitive>
         </DialogContent>
       </Dialog>
     </>
@@ -463,7 +485,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
     setIsMobileOpen(false);
   }, [pathname]);
 
-  const isPublicPage = ["/", "/about", "/contact", "/terms", "/login", "/signup"].includes(pathname);
+  const isPublicPage = ["/", "/about", "/contact", "/privacy", "/terms", "/login", "/signup"].includes(pathname);
 
   if (status === "unauthenticated" || isPublicPage) {
     return (
@@ -476,6 +498,17 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
               <span className="font-extrabold text-xl tracking-tight">DeltaPro</span>
             </Link>
+
+            {/* Mobile Actions */}
+            <div className="flex md:hidden items-center gap-2">
+              <Button asChild variant="ghost" size="sm" className="font-bold px-2 h-8">
+                <Link href="/login">Sign In</Link>
+              </Button>
+              <Button asChild size="sm" className="rounded-full px-4 h-8 font-bold shadow-lg shadow-primary/20">
+                <Link href="/signup">Join</Link>
+              </Button>
+            </div>
+
             <nav className="hidden md:flex items-center gap-8">
               <Button asChild variant="ghost" size="sm" className="font-bold">
                 <Link href="/login">Sign In</Link>
@@ -487,21 +520,23 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="relative flex-1">{children}</main>
-        <footer className="py-12 border-t bg-muted/20 shrink-0">
-          <div className="container mx-auto px-4 text-center">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                &copy; {new Date().getFullYear()} DeltaLabs by Utkristi.io
-              </p>
-              <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                <Link href="/about" className="hover:text-primary transition-colors">About</Link>
-                <Link href="/contact" className="hover:text-primary transition-colors">Contact</Link>
-                <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
-                <Link href="/terms" className="hover:text-primary transition-colors">Terms</Link>
+        {pathname !== "/login" && pathname !== "/signup" && (
+          <footer className="py-12 border-t bg-muted/20 shrink-0">
+            <div className="container mx-auto px-4 text-center">
+              <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                  &copy; {new Date().getFullYear()} DeltaLabs by Utkristi.io
+                </p>
+                <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                  <Link href="/about" className="hover:text-primary transition-colors">About</Link>
+                  <Link href="/contact" className="hover:text-primary transition-colors">Contact</Link>
+                  <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
+                  <Link href="/terms" className="hover:text-primary transition-colors">Terms</Link>
+                </div>
               </div>
             </div>
-          </div>
-        </footer>
+          </footer>
+        )}
       </div>
     );
   }

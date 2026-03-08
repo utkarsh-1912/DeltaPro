@@ -61,11 +61,27 @@ model User {
   leaveRequests  LeaveRequest[]  @relation("UserLeaves")
   approvedLeaves LeaveRequest[]  @relation("ApprovedLeaves")
   notifications  Notification[]
+  taskComments   TaskComment[]
   managerId      String?
   manager        User?           @relation("UserManager", fields: [managerId], references: [id])
   subordinates   User[]          @relation("UserManager")
   attendanceRequests     AttendanceRequest[] @relation("UserAttendanceRequests")
   approvedAttendanceReqs AttendanceRequest[] @relation("ApprovedAttendanceRequests")
+  leaveBalances         LeaveBalance[]
+}
+
+model LeaveBalance {
+  id          String   @id @default(cuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type        String   // e.g., CASUAL, SICK, EARNED
+  total       Float    @default(0)
+  used        Float    @default(0)
+  available   Float    @default(0)
+  year        Int      @default(2026)
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, type, year])
 }
 
 model VerificationToken {
@@ -220,21 +236,33 @@ enum TaskType {
 }
 
 model Task {
-  id          String       @id @default(cuid())
-  key         String       @unique
+  id          String        @id @default(cuid())
+  key         String        @unique
   title       String
   description String?
-  status      TaskStatus   @default(TODO)
-  priority    TaskPriority @default(MEDIUM)
-  type        TaskType     @default(TASK)
+  status      TaskStatus    @default(TODO)
+  priority    TaskPriority  @default(MEDIUM)
+  type        TaskType      @default(TASK)
   reporterId  String
-  reporter    User         @relation("ReportedTasks", fields: [reporterId], references: [id])
+  reporter    User          @relation("ReportedTasks", fields: [reporterId], references: [id])
   assigneeId  String?
-  assignee    User?        @relation("AssignedTasks", fields: [assigneeId], references: [id])
+  assignee    User?         @relation("AssignedTasks", fields: [assigneeId], references: [id])
   projectId   String
-  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskComments   TaskComment[]
+  createdAt      DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model TaskComment {
+  id        String   @id @default(cuid())
+  content   String   @db.Text
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Workspace {
@@ -292,8 +320,11 @@ model LeaveRequest {
   type        String      // e.g., CASUAL, SICK, EARNED
   startDate   DateTime
   endDate     DateTime
+  isHalfDay   Boolean     @default(false)
+  duration    Float       @default(1.0)
   status      LeaveStatus @default(PENDING)
   reason      String?
+  isPaid      Boolean     @default(true)
   approverId  String?
   approver    User?       @relation("ApprovedLeaves", fields: [approverId], references: [id])
   createdAt   DateTime    @default(now())

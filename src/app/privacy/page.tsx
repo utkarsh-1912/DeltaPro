@@ -39,7 +39,7 @@ export default function PrivacyPage() {
                         >
                             <ShieldCheck className="h-3 w-3" /> Data Security
                         </motion.div>
-                        <h1 className="text-5xl font-black tracking-tight leading-none">
+                        <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">
                             Privacy <span className="text-emerald-500">Policy.</span>
                         </h1>
                         <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs">

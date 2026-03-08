@@ -19,6 +19,10 @@ export async function PATCH(req: Request, { params }: { params: { id: string } }
                 priority,
                 type,
                 assigneeId
+            },
+            include: {
+                project: true,
+                assignee: true,
             }
         });
 

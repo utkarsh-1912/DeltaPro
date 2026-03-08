@@ -63,7 +63,7 @@ export default function AboutPage() {
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
-              className="text-6xl font-black tracking-tighter"
+              className="text-4xl md:text-6xl font-black tracking-tighter"
             >
               Master Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary to-purple-600">Workforce.</span>
             </motion.h1>

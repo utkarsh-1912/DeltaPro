@@ -62,7 +62,7 @@ export default function ContactPage() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="text-5xl font-black tracking-tighter leading-none"
+                  className="text-3xl md:text-5xl font-black tracking-tighter leading-none"
                 >
                   Let's Talk <span className="text-primary">Strategy.</span>
                 </motion.h1>

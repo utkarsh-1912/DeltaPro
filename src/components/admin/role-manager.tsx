@@ -19,7 +19,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { getUserRole } from "@/lib/auth-roles";
 import { Loader } from "lucide-react";
 
 // This is a mocked function. In a real scenario, this would
@@ -49,9 +48,7 @@ export function RoleManager() {
   React.useEffect(() => {
     const roles: Record<string, UserProfile['role']> = {};
     users.forEach(user => {
-      if (user.email) {
-        roles[user.id] = getUserRole(user.email);
-      }
+      roles[user.id] = (user.role?.toLowerCase() as UserProfile['role']) || 'user';
     });
     setUserRoles(roles);
   }, [users]);

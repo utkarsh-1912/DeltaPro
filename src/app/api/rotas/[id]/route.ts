@@ -1,25 +1,27 @@
-export const dynamic = 'force-dynamic';
-import { requireRole, handleAuthError } from "@/lib/auth-utils";
-import { Role } from "@prisma/client";
+import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { NextResponse } from "next/server";
 
 export async function GET() {
     try {
+        const session = await auth();
+        if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         const rotas = await prisma.rotaGeneration.findMany({
             include: { weekendRotas: true },
             orderBy: { startDate: "desc" },
         });
         return NextResponse.json(rotas);
     } catch (error) {
-        if (error instanceof Error && (error.message === "Unauthorized" || error.message === "Forbidden")) return handleAuthError(error);
         return NextResponse.json({ error: "Failed to fetch rotas" }, { status: 500 });
     }
 }
 
 export async function POST(req: Request) {
     try {
-        await requireRole([Role.ADMIN, Role.HR, Role.PM]);
+        const session = await auth();
+        if (!session?.user || !["ADMIN", "HR", "PM"].includes(session.user.role)) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
         const body = await req.json();
         const rota = await prisma.rotaGeneration.create({
             data: {
@@ -38,7 +40,6 @@ export async function POST(req: Request) {
         });
         return NextResponse.json(rota, { status: 201 });
     } catch (error) {
-        if (error instanceof Error && (error.message === "Unauthorized" || error.message === "Forbidden")) return handleAuthError(error);
         return NextResponse.json({ error: "Failed to create rota" }, { status: 500 });
     }
 }
