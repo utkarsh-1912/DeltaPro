@@ -2,35 +2,45 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  DeltaPro design system
+  Light: ice paper + navy ink (after reminous.com). Dark: night ink + film grain (after eddyrlora.com).
+  Display: Archivo, condensed via the wdth axis. Body: Inter Tight. Labels and data: Geist Mono.
+*/
 :root {
-  --sidebar-width: 280px;
-  --sidebar-collapsed-width: 72px;
+  --sidebar-width: 264px;
+  --sidebar-collapsed-width: 76px;
   --header-height: 64px;
 }
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 220 38% 97%;
+    --foreground: 222 57% 13%;
     --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card-foreground: 222 57% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.75rem;
-    --sidebar-background: var(--background);
+    --popover-foreground: 222 57% 13%;
+    --primary: 222 57% 13%;
+    --primary-foreground: 220 38% 97%;
+    --secondary: 220 33% 93%;
+    --secondary-foreground: 222 57% 15%;
+    --muted: 220 30% 93%;
+    --muted-foreground: 222 14% 42%;
+    --accent: 221 80% 93%;
+    --accent-foreground: 222 57% 15%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 222 22% 88%;
+    --input: 222 22% 86%;
+    --ring: 221 83% 55%;
+    --radius: 0.9rem;
+    --signal: 221 83% 53%;
+    --ink: 222 57% 13%;
+    --paper: 220 38% 97%;
+    --success: 158 64% 32%;
+    --warning: 35 92% 42%;
+    --sidebar-background: 0 0% 100%;
     --sidebar-foreground: var(--foreground);
     --sidebar-primary: var(--primary);
     --sidebar-primary-foreground: var(--primary-foreground);
@@ -38,38 +48,44 @@
     --sidebar-accent-foreground: var(--secondary-foreground);
     --sidebar-border: var(--border);
     --sidebar-ring: var(--ring);
-    --chart-1: 221.2 83.2% 53.3%;
-    --chart-2: 212 92% 43%;
-    --chart-3: 199 89% 48%;
-    --chart-4: 175 84% 32%;
-    --chart-5: 160 84% 39%;
+    --chart-1: 222 57% 22%;
+    --chart-2: 221 83% 58%;
+    --chart-3: 199 89% 46%;
+    --chart-4: 172 66% 36%;
+    --chart-5: 35 92% 50%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 48%;
-    --chart-1: 217.2 91.2% 59.8%;
-    --chart-2: 212 92% 43%;
-    --chart-3: 199 89% 48%;
-    --chart-4: 175 84% 32%;
-    --chart-5: 160 84% 39%;
+    --background: 60 4% 4.5%;
+    --foreground: 45 14% 92%;
+    --card: 60 3% 7.5%;
+    --card-foreground: 45 14% 92%;
+    --popover: 60 3% 8%;
+    --popover-foreground: 45 14% 92%;
+    --primary: 45 14% 92%;
+    --primary-foreground: 60 4% 6%;
+    --secondary: 60 3% 12%;
+    --secondary-foreground: 45 14% 92%;
+    --muted: 60 3% 11%;
+    --muted-foreground: 45 6% 62%;
+    --accent: 221 40% 18%;
+    --accent-foreground: 45 14% 94%;
+    --destructive: 0 66% 54%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 60 3% 16%;
+    --input: 60 3% 18%;
+    --ring: 221 90% 68%;
+    --signal: 221 92% 68%;
+    --ink: 60 4% 4.5%;
+    --paper: 45 14% 92%;
+    --success: 158 60% 50%;
+    --warning: 38 92% 60%;
+    --sidebar-background: 60 4% 5.5%;
+    --chart-1: 45 14% 88%;
+    --chart-2: 221 92% 68%;
+    --chart-3: 199 89% 56%;
+    --chart-4: 172 60% 48%;
+    --chart-5: 38 92% 60%;
   }
 }
 
@@ -78,25 +94,83 @@
     @apply border-border;
   }
 
+  html { scroll-behavior: auto; }
+  html.lenis, html.lenis body { height: auto; }
+  .lenis.lenis-smooth [data-lenis-prevent] { overscroll-behavior: contain; }
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "cv11";
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  /* Film grain on the dark theme, as on eddyrlora.com. */
+  .dark body::before {
+    content: ""; position: fixed; inset: -50%; z-index: 100; pointer-events: none; opacity: .045;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+    animation: grain 1.2s steps(6) infinite;
+  }
+  h1, h2, h3 { letter-spacing: -0.025em; text-wrap: balance; }
+  ::selection { background: hsl(var(--signal) / 0.28); }
+  :focus-visible { outline: 2px solid hsl(var(--ring)); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
   }
 }
 
+@layer components {
+  /* Condensed display type: page titles, KPI figures, wordmarks. */
+  .condensed { font-stretch: 75%; font-variation-settings: "wdth" 75; }
+  .wordmark { @apply font-display uppercase font-extrabold leading-[0.82] tracking-[-0.02em]; font-variation-settings: "wdth" 62; font-stretch: 62%; }
+  .page-title { @apply condensed font-display text-[2.25rem] sm:text-[3rem] font-bold leading-[0.95] tracking-[-0.02em]; }
+  .section-title { @apply condensed font-display text-2xl font-bold tracking-[-0.01em]; }
+  .kpi { @apply condensed font-display text-4xl font-bold tabular-nums leading-none tracking-[-0.02em]; }
+  .eyebrow { @apply font-mono text-[11px] uppercase tracking-[0.16em] text-muted-foreground; }
+  .surface { @apply rounded-[var(--radius)] border bg-card; }
+  .pill { @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 font-mono text-[10.5px] uppercase tracking-[0.08em]; }
+}
+
 @layer utilities {
-  .glass {
-    @apply bg-white/40 backdrop-blur-md border border-white/20 shadow-lg dark:bg-black/40 dark:border-white/10;
+  .font-mono-label { @apply font-mono text-[11px] uppercase tracking-[0.14em]; }
+  .grain { position: relative; }
+  .grain::after {
+    content: ""; position: absolute; inset: 0; pointer-events: none; opacity: .08; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   }
+  .halftone {
+    background-image: radial-gradient(circle, hsl(var(--primary)) 1.4px, transparent 1.6px);
+    background-size: 9px 9px;
+    -webkit-mask-image: radial-gradient(circle at var(--hx, 20%) var(--hy, 50%), #000 0%, transparent 62%);
+            mask-image: radial-gradient(circle at var(--hx, 20%) var(--hy, 50%), #000 0%, transparent 62%);
+  }
+  .dotgrid {
+    background-image: radial-gradient(hsl(var(--foreground) / .10) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  .hairline { @apply border-border/70; }
+  .glass { @apply bg-white/50 backdrop-blur-md border border-white/30 shadow-lg dark:bg-black/40 dark:border-white/10; }
+  .glass-card { @apply bg-card/70 backdrop-blur-xl border shadow-2xl; }
+  .bg-ink { background-color: hsl(222 57% 9%); color: hsl(220 38% 96%); }
+  .bg-night { background-color: hsl(60 4% 4.5%); color: hsl(45 14% 92%); }
+  .bg-slate-gradient { background-color: hsl(222 57% 9%); }
+  .text-gradient { color: hsl(var(--signal)); }
+  .mono-num { font-family: var(--font-mono), ui-monospace, monospace; font-variant-numeric: tabular-nums; }
+  .mask-fade-x { -webkit-mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); mask-image: linear-gradient(90deg, transparent, #000 10%, #000 90%, transparent); }
+  .scrollbar-hide { scrollbar-width: none; }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 
-  .glass-card {
-    @apply bg-card/60 backdrop-blur-xl border border-white/10 shadow-2xl;
-  }
+  @keyframes marquee { to { transform: translateX(-50%); } }
+  .animate-marquee { animation: marquee 40s linear infinite; }
+  @keyframes drift { 0%,100% { transform: translate3d(0,0,0) } 50% { transform: translate3d(2%, -3%, 0) } }
+  .animate-drift { animation: drift 14s ease-in-out infinite; }
+  @keyframes grain { 0%,100% { transform: translate(0,0) } 20% { transform: translate(-3%,2%) } 40% { transform: translate(2%,-3%) } 60% { transform: translate(-2%,3%) } 80% { transform: translate(3%,-1%) } }
+  @keyframes scan { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+  .animate-scan { animation: scan 2.6s cubic-bezier(.65,0,.35,1) infinite; }
 
-  .bg-slate-gradient {
-    @apply bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900;
-  }
-
-  .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400;
-  }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  .page-stagger > * > * { animation: rise .7s cubic-bezier(.22,1,.36,1) both; }
+  .page-stagger > * > *:nth-child(1) { animation-delay: .02s; }
+  .page-stagger > * > *:nth-child(2) { animation-delay: .08s; }
+  .page-stagger > * > *:nth-child(3) { animation-delay: .14s; }
+  .page-stagger > * > *:nth-child(4) { animation-delay: .2s; }
+  .page-stagger > * > *:nth-child(n+5) { animation-delay: .26s; }
 }

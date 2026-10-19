@@ -178,10 +178,10 @@ export default function LeavePage() {
     };
 
     return (
-        <div className="p-4 sm:p-8 space-y-8 bg-background/50 min-h-screen">
+        <div className="space-y-8">
             <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-4xl font-black tracking-tight">Leave Management</h1>
+                    <h1 className="page-title ">Leave Management</h1>
                     <p className="text-muted-foreground font-medium">Track your balances and manage time-off requests.</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -199,9 +199,9 @@ export default function LeavePage() {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                     >
-                        <Card className="border-none shadow-xl bg-background/60 backdrop-blur-xl overflow-hidden group hover:-translate-y-1 transition-all">
+                        <Card className="border bg-background/60 overflow-hidden group hover:-translate-y-1 transition-all">
                             <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-black uppercase tracking-widest text-muted-foreground">
+                                <CardTitle className="text-sm font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground">
                                     {balance.type} LEAVE
                                 </CardTitle>
                                 <div className="p-2 rounded-xl bg-muted/50 group-hover:bg-primary/10 transition-colors">
@@ -209,8 +209,8 @@ export default function LeavePage() {
                                 </div>
                             </CardHeader>
                             <CardContent>
-                                <div className="text-4xl font-black mb-1">{balance.available}</div>
-                                <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
+                                <div className="text-4xl font-semibold mb-1">{balance.available}</div>
+                                <div className="flex items-center justify-between text-xs font-medium font-mono uppercase tracking-[0.12em] text-muted-foreground">
                                     <span>Available</span>
                                     <span>Total: {balance.total}</span>
                                 </div>
@@ -229,10 +229,10 @@ export default function LeavePage() {
 
             <Tabs defaultValue="my-leaves" className="w-full">
                 <TabsList className="bg-muted/50 p-1 rounded-2xl mb-6">
-                    <TabsTrigger value="my-leaves" className="rounded-xl px-8 font-black uppercase tracking-widest text-[10px]">My Leaves</TabsTrigger>
-                    <TabsTrigger value="request" className="rounded-xl px-8 font-black uppercase tracking-widest text-[10px]">Request Leave</TabsTrigger>
+                    <TabsTrigger value="my-leaves" className="rounded-xl px-8 font-semibold font-mono uppercase tracking-[0.12em] text-[10px]">My Leaves</TabsTrigger>
+                    <TabsTrigger value="request" className="rounded-xl px-8 font-semibold font-mono uppercase tracking-[0.12em] text-[10px]">Request Leave</TabsTrigger>
                     {isManagerOrAdmin && (
-                        <TabsTrigger value="approvals" className="rounded-xl px-8 font-black uppercase tracking-widest text-[10px] relative">
+                        <TabsTrigger value="approvals" className="rounded-xl px-8 font-semibold font-mono uppercase tracking-[0.12em] text-[10px] relative">
                             Approvals
                             {pendingRequests.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-[8px] flex items-center justify-center rounded-full text-white animate-pulse">{pendingRequests.length}</span>}
                         </TabsTrigger>
@@ -240,21 +240,21 @@ export default function LeavePage() {
                 </TabsList>
 
                 <TabsContent value="my-leaves">
-                    <Card className="border-none shadow-2xl bg-background/60 backdrop-blur-3xl rounded-[2rem]">
+                    <Card className="border bg-background/60 rounded-2xl">
                         <CardHeader>
                             <CardTitle>History</CardTitle>
                             <CardDescription>Your personal leave request log.</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="rounded-3xl border border-border/40 overflow-hidden">
+                            <div className="rounded-2xl border border-border/40 overflow-hidden">
                                 <Table>
                                     <TableHeader className="bg-muted/30">
                                         <TableRow className="border-border/40 hover:bg-transparent">
-                                            <TableHead className="font-black text-[10px] uppercase tracking-widest">Type</TableHead>
-                                            <TableHead className="font-black text-[10px] uppercase tracking-widest">Duration</TableHead>
-                                            <TableHead className="font-black text-[10px] uppercase tracking-widest">Dates</TableHead>
-                                            <TableHead className="font-black text-[10px] uppercase tracking-widest">Status</TableHead>
-                                            <TableHead className="font-black text-[10px] uppercase tracking-widest text-right">Reason</TableHead>
+                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Type</TableHead>
+                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Duration</TableHead>
+                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Dates</TableHead>
+                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Status</TableHead>
+                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em] text-right">Reason</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -283,19 +283,19 @@ export default function LeavePage() {
                 <TabsContent value="request">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                            <Card className="border-none shadow-2xl bg-background/60 backdrop-blur-2xl rounded-[2.5rem] overflow-hidden">
+                            <Card className="border bg-background/60 rounded-2xl overflow-hidden">
                                 <CardHeader className="pb-4">
                                     <CardTitle>Submit Request</CardTitle>
                                     <CardDescription>Select your leave details below.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="space-y-6">
                                     <div className="space-y-3">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Type of Leave</Label>
+                                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Type of Leave</Label>
                                         <Select value={leaveType} onValueChange={(v: LeaveType) => setLeaveType(v)}>
                                             <SelectTrigger className="h-14 bg-muted/40 border-none rounded-2xl px-6 font-bold focus:ring-2 ring-primary">
                                                 <SelectValue />
                                             </SelectTrigger>
-                                            <SelectContent className="rounded-2xl border-none shadow-2xl">
+                                            <SelectContent className="rounded-2xl border">
                                                 <SelectItem value="CASUAL">Casual Leave</SelectItem>
                                                 <SelectItem value="SICK">Sick Leave</SelectItem>
                                                 <SelectItem value="EARNED">Earned Leave</SelectItem>
@@ -304,7 +304,7 @@ export default function LeavePage() {
                                     </div>
 
                                     <div className="space-y-3">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Date Selection</Label>
+                                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Date Selection</Label>
                                         <Popover>
                                             <PopoverTrigger asChild>
                                                 <Button
@@ -326,7 +326,7 @@ export default function LeavePage() {
                                                     )}
                                                 </Button>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0 border-none shadow-3xl rounded-[2rem] overflow-hidden" align="start">
+                                            <PopoverContent className="w-auto p-0 border rounded-2xl overflow-hidden" align="start">
                                                 <Calendar
                                                     initialFocus
                                                     mode="range"
@@ -340,9 +340,9 @@ export default function LeavePage() {
                                         </Popover>
                                     </div>
 
-                                    <div className="flex items-center justify-between p-6 bg-muted/30 rounded-3xl border border-border/40">
+                                    <div className="flex items-center justify-between p-6 bg-muted/30 rounded-2xl border border-border/40">
                                         <div className="space-y-1">
-                                            <Label className="font-black text-sm">Half Day Request</Label>
+                                            <Label className="font-semibold text-sm">Half Day Request</Label>
                                             <p className="text-xs text-muted-foreground font-medium">Check if requesting only half a day.</p>
                                         </div>
                                         <Switch
@@ -353,7 +353,7 @@ export default function LeavePage() {
                                     </div>
 
                                     <div className="space-y-3">
-                                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Reason (Optional)</Label>
+                                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Reason (Optional)</Label>
                                         <Input
                                             placeholder="Brief explanation..."
                                             value={reason}
@@ -365,7 +365,7 @@ export default function LeavePage() {
                                     <Button
                                         onClick={handleRequestLeave}
                                         disabled={isSubmitting}
-                                        className="w-full h-16 rounded-[1.5rem] font-black text-lg shadow-xl shadow-primary/20 hover:scale-[1.01] transition-all active:scale-[0.98]"
+                                        className="w-full h-16 rounded-2xl font-semibold text-lg hover:scale-[1.01] transition-all active:scale-[0.98]"
                                     >
                                         {isSubmitting ? "Processing..." : "Submit Request"}
                                     </Button>
@@ -374,7 +374,7 @@ export default function LeavePage() {
                         </motion.div>
 
                         <div className="space-y-6">
-                            <Card className="border-none shadow-xl bg-primary/10 rounded-[2rem]">
+                            <Card className="border bg-primary/10 rounded-2xl">
                                 <CardHeader>
                                     <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
                                         <Clock className="h-6 w-6 text-primary" />
@@ -384,17 +384,17 @@ export default function LeavePage() {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex items-end justify-between">
-                                        <div className="text-5xl font-black">{calculateDuration(dateRange, isHalfDay)}</div>
+                                        <div className="text-5xl font-semibold">{calculateDuration(dateRange, isHalfDay)}</div>
                                         <div className="text-right">
-                                            <div className="text-xs font-black uppercase tracking-widest text-primary/60 mb-1">Total Days</div>
+                                            <div className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-primary/60 mb-1">Total Days</div>
                                             <div className="text-sm font-bold">{leaveType.replace("_", " ")}</div>
                                         </div>
                                     </div>
                                 </CardContent>
                             </Card>
 
-                            <div className="p-8 rounded-[2rem] bg-muted/30 border border-border/40 space-y-4">
-                                <h4 className="font-black text-xs uppercase tracking-widest text-muted-foreground">Pro Tips</h4>
+                            <div className="p-8 rounded-2xl bg-muted/30 border border-border/40 space-y-4">
+                                <h4 className="font-semibold text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground">Pro Tips</h4>
                                 <ul className="space-y-3 text-sm font-medium leading-relaxed">
                                     <li className="flex gap-3">
                                         <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 shrink-0" />
@@ -412,7 +412,7 @@ export default function LeavePage() {
 
                 {isManagerOrAdmin && (
                     <TabsContent value="approvals">
-                        <Card className="border-none shadow-2xl bg-background/60 backdrop-blur-3xl rounded-[2rem]">
+                        <Card className="border bg-background/60 rounded-2xl">
                             <CardHeader>
                                 <CardTitle>Pending Approvals</CardTitle>
                                 <CardDescription>Approve or suggest changes to team leave requests.</CardDescription>
@@ -426,15 +426,15 @@ export default function LeavePage() {
                                                 initial={{ opacity: 0, scale: 0.95 }}
                                                 animate={{ opacity: 1, scale: 1 }}
                                                 exit={{ opacity: 0, scale: 0.95 }}
-                                                className="p-6 rounded-[2rem] bg-muted/30 border border-border/40 flex flex-col md:flex-row items-center justify-between gap-6"
+                                                className="p-6 rounded-2xl bg-muted/30 border border-border/40 flex flex-col md:flex-row items-center justify-between gap-6"
                                             >
                                                 <div className="flex items-center gap-6 w-full md:w-auto">
-                                                    <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-xl">
+                                                    <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-semibold text-xl">
                                                         {req.user.name.charAt(0)}
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-black text-lg">{req.user.name}</h4>
-                                                        <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-2">{req.type} • {req.duration} Days</p>
+                                                        <h4 className="font-semibold text-lg">{req.user.name}</h4>
+                                                        <p className="text-xs font-medium text-muted-foreground font-mono uppercase tracking-[0.12em] mb-2">{req.type} • {req.duration} Days</p>
                                                         <p className="text-xs text-muted-foreground font-medium">
                                                             {format(new Date(req.startDate), "MMM dd")} - {format(new Date(req.endDate), "MMM dd, yyyy")}
                                                         </p>
@@ -446,14 +446,14 @@ export default function LeavePage() {
                                                         variant="outline"
                                                         size="lg"
                                                         onClick={() => handleAction(req.id, "REJECTED")}
-                                                        className="flex-1 md:flex-none h-14 rounded-2xl border-none bg-destructive/10 text-destructive font-black hover:bg-destructive/20"
+                                                        className="flex-1 md:flex-none h-14 rounded-2xl border-none bg-destructive/10 text-destructive font-semibold hover:bg-destructive/20"
                                                     >
                                                         <XCircle className="mr-2 h-5 w-5" /> Reject
                                                     </Button>
                                                     <Button
                                                         size="lg"
                                                         onClick={() => handleAction(req.id, "APPROVED")}
-                                                        className="flex-1 md:flex-none h-14 rounded-2xl font-black shadow-lg shadow-primary/20"
+                                                        className="flex-1 md:flex-none h-14 rounded-2xl font-semibold "
                                                     >
                                                         <CheckCircle2 className="mr-2 h-5 w-5" /> Approve
                                                     </Button>
@@ -464,7 +464,7 @@ export default function LeavePage() {
                                                 <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-2">
                                                     <CheckCircle2 className="h-6 w-6 text-muted-foreground" />
                                                 </div>
-                                                <p className="font-black uppercase tracking-widest text-xs">All caught up!</p>
+                                                <p className="font-semibold font-mono uppercase tracking-[0.12em] text-xs">All caught up!</p>
                                                 <p className="text-sm font-medium">No pending requests to action.</p>
                                             </div>
                                         )}

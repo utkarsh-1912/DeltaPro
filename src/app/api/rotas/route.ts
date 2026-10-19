@@ -1,46 +1,53 @@
-import { auth } from "@/auth";
-import { Role } from "@prisma/client";
+import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { MANAGER_ROLES, assertTeamAccess, parseBody, route } from "@/lib/api";
+import { emitRotaEvent } from "@/services/rota";
 
-export async function GET() {
-    try {
-        const session = await auth();
-        if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        const rotas = await prisma.rotaGeneration.findMany({
-            include: { weekendRotas: true },
-            orderBy: { startDate: "desc" },
-        });
-        return NextResponse.json(rotas);
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to fetch rotas" }, { status: 500 });
-    }
-}
+export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
-    try {
-        const session = await auth();
-        if (!session?.user || !["ADMIN", "HR", "PM"].includes(session.user.role)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-        const body = await req.json();
-        const rota = await prisma.rotaGeneration.create({
-            data: {
-                id: body.id || new Date().getTime().toString(),
-                startDate: body.startDate,
-                endDate: body.endDate,
-                teamId: body.teamId,
-                assignments: body.assignments || {},
-                teamMembersAtGeneration: body.teamMembersAtGeneration || null,
-                manualOverrides: body.manualOverrides || [],
-                manualSwaps: body.manualSwaps || [],
-                manualWeekendSwaps: body.manualWeekendSwaps || [],
-                comments: body.comments || {},
-                adhoc: body.adhoc || null,
-            },
-        });
-        return NextResponse.json(rota, { status: 201 });
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to create rota" }, { status: 500 });
-    }
-}
+export const GET = route(async () =>
+    prisma.rotaGeneration.findMany({ include: { weekendRotas: true }, orderBy: { startDate: "desc" } }),
+);
+
+const json = z.any().optional();
+
+const schema = z.object({
+    id: z.string().optional(),
+    startDate: z.string(),
+    endDate: z.string(),
+    teamId: z.string(),
+    assignments: z.record(z.string().nullable().optional()).default({}),
+    teamMembersAtGeneration: json,
+    manualOverrides: json,
+    manualSwaps: json,
+    manualWeekendSwaps: json,
+    comments: json,
+    adhoc: json,
+});
+
+const asJson = (v: unknown, fallback: Prisma.InputJsonValue | typeof Prisma.JsonNull) =>
+    v === undefined || v === null ? fallback : (v as Prisma.InputJsonValue);
+
+/** Saves a generated rota and publishes rota.published to calendar and chat connectors. */
+export const POST = route(async ({ req, user }) => {
+    const body = await parseBody(req, schema);
+    await assertTeamAccess(user, body.teamId);
+    const rota = await prisma.rotaGeneration.create({
+        data: {
+            ...(body.id ? { id: body.id } : {}),
+            startDate: body.startDate,
+            endDate: body.endDate,
+            teamId: body.teamId,
+            assignments: body.assignments as Prisma.InputJsonValue,
+            teamMembersAtGeneration: asJson(body.teamMembersAtGeneration, Prisma.JsonNull),
+            manualOverrides: asJson(body.manualOverrides, []),
+            manualSwaps: asJson(body.manualSwaps, []),
+            manualWeekendSwaps: asJson(body.manualWeekendSwaps, []),
+            comments: asJson(body.comments, {}),
+            adhoc: asJson(body.adhoc, Prisma.JsonNull),
+        },
+    });
+    await emitRotaEvent("rota.published", rota, user);
+    return Response.json(rota, { status: 201 });
+}, { roles: MANAGER_ROLES });

@@ -1,50 +1,24 @@
-import { NextResponse } from "next/server";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { parseBody, route } from "@/lib/api";
 
-export async function GET() {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const dynamic = "force-dynamic";
 
-    try {
-        const workspaces = await prisma.workspace.findMany({
-            include: {
-                owner: true,
-                pages: {
-                    orderBy: { updatedAt: 'desc' }
-                },
-                _count: {
-                    select: { pages: true }
-                }
-            },
-            orderBy: {
-                updatedAt: 'desc'
-            }
-        });
-        return NextResponse.json(workspaces);
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to fetch workspaces" }, { status: 500 });
-    }
-}
+export const GET = route(async () =>
+    prisma.workspace.findMany({
+        include: {
+            owner: { select: { id: true, name: true, email: true, image: true } },
+            pages: { orderBy: { updatedAt: "desc" } },
+            _count: { select: { pages: true } },
+        },
+        orderBy: { updatedAt: "desc" },
+    }),
+);
 
-export async function POST(req: Request) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const schema = z.object({ name: z.string().trim().min(1).max(100), description: z.string().max(1000).nullable().optional() });
 
-    try {
-        const body = await req.json();
-        const { name, description } = body;
-
-        const workspace = await prisma.workspace.create({
-            data: {
-                name,
-                description,
-                ownerId: session.user.id
-            }
-        });
-
-        return NextResponse.json(workspace);
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to create workspace" }, { status: 500 });
-    }
-}
+export const POST = route(async ({ req, user }) => {
+    const body = await parseBody(req, schema);
+    const workspace = await prisma.workspace.create({ data: { name: body.name, description: body.description ?? null, ownerId: user.id } });
+    return Response.json(workspace, { status: 201 });
+});

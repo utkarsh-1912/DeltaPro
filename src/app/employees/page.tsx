@@ -32,7 +32,7 @@ export default function EmployeesPage() {
     const [isViewOpen, setIsViewOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [editForm, setEditForm] = useState({
-        department: "", designation: "", role: "", status: "ACTIVE", phoneNumber: ""
+        department: "", designation: "", role: "", status: "ACTIVE", phoneNumber: "", managerId: "none"
     });
 
     const fetchEmployees = async () => {
@@ -89,14 +89,32 @@ export default function EmployeesPage() {
         e.preventDefault();
         if (!selectedEmp) return;
         setIsCreating(true);
-        // Note: Implementing minimal fake edit for UI demonstration, since we don't have a PATCH route for employees profile yet.
-        // A true implementation would have a PATCH /api/employees/[id] route.
-        setTimeout(() => {
-            toast({ title: "Details Updated", description: `Updated profile for ${selectedEmp.name}.` });
-            setIsEditOpen(false);
+        try {
+            const res = await fetch(`/api/employees/${selectedEmp.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    department: editForm.department || null,
+                    designation: editForm.designation || null,
+                    phoneNumber: editForm.phoneNumber || null,
+                    status: editForm.status,
+                    role: editForm.role || undefined,
+                    managerId: editForm.managerId === "none" ? null : editForm.managerId,
+                }),
+            });
+            if (res.ok) {
+                toast({ title: "Details Updated", description: `Updated profile for ${selectedEmp.name}.` });
+                setIsEditOpen(false);
+                fetchEmployees();
+            } else {
+                const data = await res.json().catch(() => ({}));
+                toast({ title: "Update failed", description: data.error || "Could not save the changes.", variant: "destructive" });
+            }
+        } catch (error) {
+            toast({ title: "Error", description: "Unexpected error occurred.", variant: "destructive" });
+        } finally {
             setIsCreating(false);
-            fetchEmployees();
-        }, 800);
+        }
     };
 
     const openEdit = (emp: any) => {
@@ -106,7 +124,8 @@ export default function EmployeesPage() {
             designation: emp.profile?.designation || "",
             role: emp.role || "USER",
             status: emp.profile?.status || "ACTIVE",
-            phoneNumber: emp.profile?.phoneNumber || ""
+            phoneNumber: emp.profile?.phoneNumber || "",
+            managerId: emp.managerId || "none"
         });
         setIsEditOpen(true);
     };
@@ -121,16 +140,16 @@ export default function EmployeesPage() {
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black tracking-tight">Team Directory</h1>
+                    <h1 className="page-title ">Team Directory</h1>
                     <p className="text-sm font-medium text-muted-foreground mt-1">Manage workforce profiles, roles, and departmental assignments.</p>
                 </div>
                 <div className="flex items-center gap-3">
                     <Button variant="outline" className="rounded-full shadow-sm"><Filter className="mr-2 h-4 w-4" /> Filters</Button>
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>
-                            <Button className="rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"><Plus className="mr-2 h-4 w-4" /> Add Employee</Button>
+                            <Button className="rounded-full hover:shadow-primary/30 transition-all"><Plus className="mr-2 h-4 w-4" /> Add Employee</Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[500px] border-none shadow-2xl bg-background/95 backdrop-blur-xl rounded-2xl">
+                        <DialogContent className="sm:max-w-[500px] border bg-background/95 rounded-2xl">
                             <form onSubmit={handleCreateEmployee}>
                                 <DialogHeader>
                                     <DialogTitle>Onboard Team Member</DialogTitle>
@@ -149,7 +168,7 @@ export default function EmployeesPage() {
                                             <Label htmlFor="emp-id">Employee ID</Label>
                                             <div className="relative">
                                                 <Hash className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                                                <Input id="emp-id" placeholder="EMP-001" value={newEmp.employeeId} onChange={(e) => setNewEmp({ ...newEmp, employeeId: e.target.value })} className="pl-9 uppercase" />
+                                                <Input id="emp-id" placeholder="EMP-001" value={newEmp.employeeId} onChange={(e) => setNewEmp({ ...newEmp, employeeId: e.target.value })} className="pl-9 uppercase font-mono" />
                                             </div>
                                         </div>
                                     </div>
@@ -181,7 +200,9 @@ export default function EmployeesPage() {
                                             </SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="USER">Standard User</SelectItem>
-                                                <SelectItem value="MANAGER">Manager</SelectItem>
+                                                <SelectItem value="DEV">Developer</SelectItem>
+                                                <SelectItem value="PM">Project Manager</SelectItem>
+                                                <SelectItem value="HR">HR</SelectItem>
                                                 <SelectItem value="ADMIN">Administrator</SelectItem>
                                             </SelectContent>
                                         </Select>
@@ -200,29 +221,29 @@ export default function EmployeesPage() {
 
                     {/* View Profile Dialog */}
                     <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-                        <DialogContent className="sm:max-w-[425px] border-none shadow-2xl bg-background/95 backdrop-blur-xl rounded-2xl">
+                        <DialogContent className="sm:max-w-[425px] border bg-background/95 rounded-2xl">
                             {selectedEmp && (
                                 <>
                                     <DialogHeader className="pb-4 border-b text-center">
                                         <div className="flex justify-center mb-4 mt-2">
-                                            <Avatar className="h-24 w-24 border-4 border-background ring-2 ring-primary/20 shadow-xl">
+                                            <Avatar className="h-24 w-24 border-4 border-background ring-2 ring-primary/20 shadow-lg">
                                                 <AvatarImage src={selectedEmp.image} />
                                                 <AvatarFallback className="text-3xl bg-primary/10 text-primary font-bold">{selectedEmp.name?.substring(0, 2).toUpperCase()}</AvatarFallback>
                                             </Avatar>
                                         </div>
-                                        <DialogTitle className="text-2xl font-black">{selectedEmp.name}</DialogTitle>
-                                        <DialogDescription className="font-bold text-primary tracking-widest uppercase text-xs">
+                                        <DialogTitle className="text-2xl font-semibold">{selectedEmp.name}</DialogTitle>
+                                        <DialogDescription className="font-medium text-primary tracking-[0.12em] uppercase text-xs font-mono">
                                             {selectedEmp.profile?.designation || "Unassigned Role"}
                                         </DialogDescription>
                                     </DialogHeader>
                                     <div className="py-6 space-y-6">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Department</p>
+                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider font-mono">Department</p>
                                                 <p className="font-medium">{selectedEmp.profile?.department || "General"}</p>
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Status</p>
+                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider font-mono">Status</p>
                                                 <Badge variant="outline" className={cn(
                                                     "font-bold text-xs uppercase",
                                                     selectedEmp.profile?.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-muted text-muted-foreground"
@@ -231,11 +252,11 @@ export default function EmployeesPage() {
                                                 </Badge>
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Email</p>
+                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider font-mono">Email</p>
                                                 <p className="font-medium text-sm truncate">{selectedEmp.email}</p>
                                             </div>
                                             <div className="space-y-1">
-                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider">Employee ID</p>
+                                                <p className="text-xs text-muted-foreground font-semibold uppercase tracking-wider font-mono">Employee ID</p>
                                                 <p className="font-mono text-sm">{selectedEmp.profile?.employeeId || "N/A"}</p>
                                             </div>
                                         </div>
@@ -250,7 +271,7 @@ export default function EmployeesPage() {
 
                     {/* Edit Details Dialog */}
                     <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                        <DialogContent className="sm:max-w-[425px] border-none shadow-2xl bg-background/95 backdrop-blur-xl rounded-2xl">
+                        <DialogContent className="sm:max-w-[425px] border bg-background/95 rounded-2xl">
                             {selectedEmp && (
                                 <form onSubmit={handleEditEmployee}>
                                     <DialogHeader>
@@ -267,6 +288,19 @@ export default function EmployeesPage() {
                                                 <Label htmlFor="edit-desig">Designation</Label>
                                                 <Input id="edit-desig" value={editForm.designation} onChange={(e) => setEditForm({ ...editForm, designation: e.target.value })} />
                                             </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Reports to</Label>
+                                            <Select value={editForm.managerId} onValueChange={(v) => setEditForm({ ...editForm, managerId: v })}>
+                                                <SelectTrigger><SelectValue placeholder="No manager" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="none">No manager</SelectItem>
+                                                    {employees.filter(e => e.id !== selectedEmp.id && e.isActive !== false).map(e => (
+                                                        <SelectItem key={e.id} value={e.id}>{e.name || e.email}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <p className="text-[10px] text-muted-foreground">Their manager approves leave and attendance corrections.</p>
                                         </div>
                                         <div className="space-y-2">
                                             <Label htmlFor="edit-phone">Phone Number</Label>
@@ -291,7 +325,9 @@ export default function EmployeesPage() {
                                                     <SelectTrigger><SelectValue /></SelectTrigger>
                                                     <SelectContent>
                                                         <SelectItem value="USER">Standard User</SelectItem>
-                                                        <SelectItem value="MANAGER">Manager</SelectItem>
+                                                        <SelectItem value="DEV">Developer</SelectItem>
+                                                        <SelectItem value="PM">Project Manager</SelectItem>
+                                                        <SelectItem value="HR">HR</SelectItem>
                                                         <SelectItem value="ADMIN">Administrator</SelectItem>
                                                     </SelectContent>
                                                 </Select>
@@ -311,7 +347,7 @@ export default function EmployeesPage() {
                 </div>
             </div>
 
-            <div className="flex items-center gap-4 bg-card/60 backdrop-blur-md p-2 rounded-2xl border shadow-sm w-full md:w-[400px]">
+            <div className="flex items-center gap-4 bg-card/60 p-2 rounded-2xl border shadow-sm w-full md:w-[400px]">
                 <div className="relative flex-1">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
@@ -327,13 +363,13 @@ export default function EmployeesPage() {
                 <AnimatePresence mode="popLayout">
                     {isLoading ? (
                         [1, 2, 3, 4, 5, 6].map((i) => (
-                            <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-64 rounded-3xl bg-muted/40 animate-pulse border-2 border-dashed border-muted" />
+                            <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-64 rounded-2xl bg-muted/40 animate-pulse border border-dashed border-muted" />
                         ))
                     ) : filteredEmployees.length === 0 ? (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full">
-                            <Card className="py-16 border-dashed border-2 text-center bg-muted/20 rounded-3xl">
+                            <Card className="py-16 border-dashed border text-center bg-muted/20 rounded-2xl">
                                 <CardContent className="space-y-4">
-                                    <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto shadow-inner">
+                                    <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mx-auto ">
                                         <UserCircle className="h-8 w-8 text-muted-foreground/60" />
                                     </div>
                                     <div className="space-y-1">
@@ -353,7 +389,7 @@ export default function EmployeesPage() {
                                 exit={{ opacity: 0, scale: 0.9 }}
                                 transition={{ delay: idx * 0.05, type: "spring", stiffness: 300, damping: 24 }}
                             >
-                                <Card className="group h-full flex flex-col hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20 transition-all border-2 shadow-sm overflow-hidden rounded-3xl bg-card/50 backdrop-blur-sm relative hover:shadow-xl hover:shadow-primary/5">
+                                <Card className="group h-full flex flex-col hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20 transition-all border overflow-hidden rounded-2xl bg-card/50 relative ">
                                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     <CardHeader className="pb-4 relative z-10 p-6 flex flex-row items-center justify-between">
                                         <Avatar className="h-16 w-16 border-4 border-background ring-2 ring-muted group-hover:ring-primary/30 transition-all shadow-md">
@@ -364,7 +400,7 @@ export default function EmployeesPage() {
                                             <DropdownMenuTrigger asChild>
                                                 <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background shadow-sm hover:shadow-md transition-all"><MoreHorizontal className="h-4 w-4" /></Button>
                                             </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-xl">
+                                            <DropdownMenuContent align="end" className="w-48 rounded-xl shadow-lg">
                                                 <DropdownMenuItem className="font-medium cursor-pointer" onClick={() => { setSelectedEmp(emp); setIsViewOpen(true); }}><UserCircle className="mr-2 h-4 w-4" /> View Profile</DropdownMenuItem>
                                                 <DropdownMenuItem className="font-medium cursor-pointer" onClick={() => openEdit(emp)}><BadgeCheck className="mr-2 h-4 w-4" /> Edit Details</DropdownMenuItem>
                                                 <DropdownMenuItem className="text-destructive focus:text-destructive font-medium cursor-pointer" onClick={() => toast({ title: "Termination Action Required", description: "Please contact an Administrator to terminate access securely.", variant: "destructive" })}><UserCircle className="mr-2 h-4 w-4" /> Terminate Access</DropdownMenuItem>
@@ -375,12 +411,12 @@ export default function EmployeesPage() {
                                         <div>
                                             <div className="flex items-center gap-1.5 mb-1">
                                                 <CardTitle className="text-xl group-hover:text-primary transition-colors line-clamp-1">{emp.name}</CardTitle>
-                                                {emp.role === "ADMIN" && <BadgeCheck className="h-4 w-4 text-blue-500 flex-shrink-0" />}
+                                                {emp.role === "ADMIN" && <BadgeCheck className="h-4 w-4 text-signal flex-shrink-0" />}
                                             </div>
-                                            <CardDescription className="font-bold text-foreground/70 uppercase tracking-wider text-[10px]">{emp.profile?.designation || "Unassigned"}</CardDescription>
+                                            <CardDescription className="font-medium text-foreground/70 uppercase tracking-wider text-[10px] font-mono">{emp.profile?.designation || "Unassigned"}</CardDescription>
                                         </div>
                                         <div className="flex flex-wrap gap-2">
-                                            <Badge variant="secondary" className="font-bold text-[9px] uppercase hover:bg-muted cursor-default border-transparent">{emp.profile?.department || "General"}</Badge>
+                                            <Badge variant="secondary" className="font-medium text-[9px] uppercase hover:bg-muted cursor-default border-transparent font-mono">{emp.profile?.department || "General"}</Badge>
                                             <Badge variant="outline" className={cn(
                                                 "font-bold text-[9px] uppercase",
                                                 emp.profile?.status === "ACTIVE" ? "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800" : "bg-muted/50 text-muted-foreground border-dashed"
@@ -403,7 +439,7 @@ export default function EmployeesPage() {
                                         {emp.profile?.employeeId && (
                                             <div className="flex items-center text-muted-foreground w-full mt-2 pt-2 border-t border-dashed">
                                                 <Hash className="mr-3 h-3.5 w-3.5 flex-shrink-0" />
-                                                <span className="font-mono text-[10px] tracking-widest uppercase">{emp.profile.employeeId}</span>
+                                                <span className="font-mono text-[10px] tracking-[0.12em] uppercase">{emp.profile.employeeId}</span>
                                             </div>
                                         )}
                                     </CardFooter>

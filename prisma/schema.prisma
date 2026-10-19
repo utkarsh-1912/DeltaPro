@@ -48,7 +48,9 @@ model User {
   email         String?   @unique
   emailVerified DateTime?
   image         String?
+  passwordHash  String?
   role          Role      @default(USER)
+  isActive      Boolean   @default(true)
   accounts      Account[]
   sessions      Session[]
   projects      Project[]
@@ -68,6 +70,9 @@ model User {
   attendanceRequests     AttendanceRequest[] @relation("UserAttendanceRequests")
   approvedAttendanceReqs AttendanceRequest[] @relation("ApprovedAttendanceRequests")
   leaveBalances         LeaveBalance[]
+  rotaMemberships       TeamMember[]
+  auditLogs             AuditLog[]
+  integrationsCreated   Integration[]
 }
 
 model LeaveBalance {
@@ -78,7 +83,7 @@ model LeaveBalance {
   total       Float    @default(0)
   used        Float    @default(0)
   available   Float    @default(0)
-  year        Int      @default(2026)
+  year        Int
   updatedAt   DateTime @updatedAt
 
   @@unique([userId, type, year])
@@ -111,7 +116,12 @@ model TeamMember {
   team         Team?   @relation(fields: [teamId], references: [id])
   fixedShiftId String?
   lastShiftId  String?
+  userId       String?
+  user         User?   @relation(fields: [userId], references: [id], onDelete: SetNull)
   leaves       Leave[]
+
+  @@index([teamId])
+  @@index([userId])
 }
 
 model Shift {
@@ -171,9 +181,17 @@ model AttendanceLog {
   latitude       Float?
   longitude      Float?
   accuracy       Float?
+  logoutLatitude  Float?
+  logoutLongitude Float?
+  distanceMeters Float?    // distance from office at clock-in (null for WFH)
   status         String   @default("LOGGED_IN") // LOGGED_IN, LOGGED_OUT, AUTO_LOGOUT
+  autoLogoutReason String? // OUT_OF_RANGE, MAX_HOURS
+  source         String   @default("WEB") // WEB, DEVICE, REGULARIZATION
   isWfh          Boolean  @default(false)
   user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, loginTime])
+  @@index([status])
 }
 
 model AttendanceRequest {
@@ -188,6 +206,8 @@ model AttendanceRequest {
   approver    User?    @relation("ApprovedAttendanceRequests", fields: [approverId], references: [id])
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([userId, status])
 }
 
 model AttendanceSettings {
@@ -197,6 +217,9 @@ model AttendanceSettings {
   officeLng         Float   @default(72.8777)
   allowedRadius     Int     @default(500)     // meters
   wfhAllowed        Boolean @default(true)
+  maxAccuracyMeters Int     @default(200)     // reject office clock-ins with worse GPS accuracy
+  autoLogoutHours   Int     @default(12)      // close sessions left open longer than this
+  autoLogoutOutOfRange Boolean @default(true) // clock out office sessions that leave the geofence
   updatedAt         DateTime @updatedAt
 }
 
@@ -252,6 +275,9 @@ model Task {
   taskComments   TaskComment[]
   createdAt      DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
+
+  @@index([projectId, status])
+  @@index([assigneeId])
 }
 
 model TaskComment {
@@ -329,6 +355,9 @@ model LeaveRequest {
   approver    User?       @relation("ApprovedLeaves", fields: [approverId], references: [id])
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
+
+  @@index([userId, status])
+  @@index([startDate])
 }
 
 model Notification {
@@ -340,4 +369,88 @@ model Notification {
   type        String   @default("info") // success, alert, task, info
   read        Boolean  @default(false)
   createdAt   DateTime @default(now())
+
+  @@index([userId, read])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  action     String   // e.g. leave.approved, user.role_changed, integration.updated
+  entityType String
+  entityId   String
+  data       Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}
+
+// ---------- Connectors ----------
+
+model Integration {
+  id          String   @id @default(cuid())
+  provider    String   // slack, teams, email, google_calendar, outlook, jira, github, bamboohr, hris_webhook, webhook, scim, device
+  name        String
+  enabled     Boolean  @default(true)
+  config      Json     @default("{}")
+  credentials String?  @db.Text // AES-256-GCM encrypted JSON
+  events      String[] // subscribed event types; "*" = all
+  lastSyncAt  DateTime?
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deliveries  Delivery[]
+  links       ExternalLink[]
+}
+
+model OutboxEvent {
+  id         String     @id @default(cuid())
+  type       String
+  version    Int        @default(1)
+  payload    Json
+  status     String     @default("PENDING") // PENDING, DISPATCHING, DISPATCHED
+  createdAt  DateTime   @default(now())
+  deliveries Delivery[]
+
+  @@index([status, createdAt])
+}
+
+model Delivery {
+  id            String      @id @default(cuid())
+  eventId       String
+  event         OutboxEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  status        String      @default("PENDING") // PENDING, RUNNING, DONE, FAILED, DEAD
+  attempts      Int         @default(0)
+  nextRunAt     DateTime    @default(now())
+  lastError     String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@unique([eventId, integrationId])
+  @@index([status, nextRunAt])
+  @@index([integrationId, createdAt])
+}
+
+model ExternalLink {
+  id            String      @id @default(cuid())
+  integrationId String
+  integration   Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+  localType     String      // LeaveRequest, Task, User, RotaAssignment
+  localId       String
+  externalId    String
+  createdAt     DateTime    @default(now())
+
+  @@unique([integrationId, localType, localId])
+  @@index([integrationId, externalId])
+}
+
+model InboundEvent {
+  id         String   @id // provider-scoped delivery id
+  provider   String
+  receivedAt DateTime @default(now())
 }

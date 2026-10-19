@@ -18,7 +18,7 @@ import { format } from "date-fns";
 
 export default function ProjectsPage() {
     const { toast } = useToast();
-    const [projects, setProjects] = useState([]);
+    const [projects, setProjects] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
 
@@ -89,7 +89,7 @@ export default function ProjectsPage() {
         <div className="space-y-8">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-extrabold tracking-tight">Project Portfolio</h1>
+                    <h1 className="page-title ">Project Portfolio</h1>
                     <p className="text-muted-foreground mt-1 text-sm">Manage enterprise initiatives, tasks, and team collaborations.</p>
                 </div>
                 <div className="flex items-center gap-3">
@@ -104,9 +104,9 @@ export default function ProjectsPage() {
                     </div>
                     <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
                         <DialogTrigger asChild>
-                            <Button className="rounded-full shadow-lg shadow-primary/20 hover:shadow-primary/30 transition-all"><Plus className="mr-2 h-4 w-4" /> New Project</Button>
+                            <Button className="rounded-full hover:shadow-primary/30 transition-all"><Plus className="mr-2 h-4 w-4" /> New Project</Button>
                         </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px] border-none shadow-2xl bg-background/95 backdrop-blur-xl">
+                        <DialogContent className="sm:max-w-[425px] border bg-background/95 ">
                             <form onSubmit={handleCreateProject}>
                                 <DialogHeader>
                                     <DialogTitle>Create Enterprise Project</DialogTitle>
@@ -121,7 +121,7 @@ export default function ProjectsPage() {
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="key">Project Key</Label>
-                                        <Input id="key" placeholder="e.g. MKT" className="uppercase" maxLength={10} value={newProject.key} onChange={(e) => setNewProject({ ...newProject, key: e.target.value })} />
+                                        <Input id="key" placeholder="e.g. MKT" className="uppercase font-mono" maxLength={10} value={newProject.key} onChange={(e) => setNewProject({ ...newProject, key: e.target.value })} />
                                     </div>
                                     <div className="space-y-2">
                                         <Label htmlFor="description">Description</Label>
@@ -144,12 +144,12 @@ export default function ProjectsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 <AnimatePresence mode="popLayout">
                     {isLoading ? (
-                        [1, 2, 3, 4].map(i => <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-64 rounded-3xl bg-muted/50 animate-pulse border-2 border-dashed border-muted" />)
+                        [1, 2, 3, 4].map(i => <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-64 rounded-2xl bg-muted/50 animate-pulse border border-dashed border-muted" />)
                     ) : filteredProjects.length === 0 ? (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full">
-                            <Card className="py-16 border-dashed border-2 text-center bg-muted/20 rounded-3xl">
+                            <Card className="py-16 border-dashed border text-center bg-muted/20 rounded-2xl">
                                 <CardContent className="space-y-4">
-                                    <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mx-auto shadow-inner">
+                                    <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mx-auto ">
                                         <Briefcase className="h-10 w-10 text-muted-foreground/60" />
                                     </div>
                                     <div className="space-y-1">
@@ -170,11 +170,11 @@ export default function ProjectsPage() {
                                 exit={{ opacity: 0, scale: 0.9 }}
                                 transition={{ delay: idx * 0.05, type: "spring", stiffness: 300, damping: 24 }}
                             >
-                                <Card className="group h-full flex flex-col hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20 transition-all border-2 shadow-sm overflow-hidden rounded-3xl cursor-pointer bg-card/50 backdrop-blur-sm relative hover:shadow-xl hover:shadow-primary/5">
+                                <Card className="group h-full flex flex-col hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20 transition-all border overflow-hidden rounded-2xl cursor-pointer bg-card/50 relative ">
                                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     <CardHeader className="pb-4 relative z-10 p-6">
                                         <div className="flex items-start justify-between mb-4">
-                                            <div className="h-12 w-12 bg-primary text-primary-foreground rounded-2xl flex items-center justify-center font-black text-sm tracking-widest shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
+                                            <div className="h-12 w-12 bg-primary text-primary-foreground rounded-2xl flex items-center justify-center font-semibold text-sm tracking-[0.12em] group-hover:scale-110 transition-transform">
                                                 {project.key}
                                             </div>
                                             <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
@@ -187,7 +187,7 @@ export default function ProjectsPage() {
                                     </CardHeader>
                                     <CardContent className="space-y-6 flex-1 px-6 pb-2">
                                         <div className="space-y-3">
-                                            <div className="flex items-center justify-between text-xs font-bold uppercase tracking-widest">
+                                            <div className="flex items-center justify-between text-xs font-medium font-mono uppercase tracking-[0.12em]">
                                                 <span className={cn(project.metrics?.status === "Completed" ? "text-emerald-500" : "text-muted-foreground")}>Progress</span>
                                                 <span className={cn(project.metrics?.status === "Completed" ? "text-emerald-500" : "text-primary")}>{project.metrics?.progress || 0}%</span>
                                             </div>
@@ -205,7 +205,7 @@ export default function ProjectsPage() {
                                                     </Avatar>
                                                 ))}
                                                 {(!project.team?.members || project.team.members.length === 0) ? (
-                                                    <div className="h-8 w-8 rounded-full border-2 border-dashed border-muted-foreground/30 flex items-center justify-center">
+                                                    <div className="h-8 w-8 rounded-full border border-dashed border-muted-foreground/30 flex items-center justify-center">
                                                         <Users className="h-3 w-3 text-muted-foreground/50" />
                                                     </div>
                                                 ) : (project.team.members.length > 3) && (
@@ -219,16 +219,16 @@ export default function ProjectsPage() {
                                             </div>
                                         </div>
                                     </CardContent>
-                                    <CardFooter className="bg-muted/20 p-4 border-t flex items-center justify-between text-[10px] font-bold uppercase tracking-widest mt-auto">
+                                    <CardFooter className="bg-muted/20 p-4 border-t flex items-center justify-between text-[10px] font-medium font-mono uppercase tracking-[0.12em] mt-auto">
                                         <div className={cn(
                                             "flex items-center gap-2",
                                             project.metrics?.status === "Completed" ? "text-emerald-600 dark:text-emerald-400" :
-                                                project.metrics?.status === "In Progress" ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground"
+                                                project.metrics?.status === "In Progress" ? "text-signal dark:text-signal" : "text-muted-foreground"
                                         )}>
                                             <div className={cn(
                                                 "h-2 w-2 rounded-full",
                                                 project.metrics?.status === "Completed" ? "bg-emerald-500" :
-                                                    project.metrics?.status === "In Progress" ? "bg-blue-500 animate-pulse" : "bg-muted-foreground"
+                                                    project.metrics?.status === "In Progress" ? "bg-signal animate-pulse" : "bg-muted-foreground"
                                             )} />
                                             {project.metrics?.status || "Not Started"}
                                         </div>

@@ -1,39 +1,19 @@
-import { auth } from "@/auth";
-import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { HttpError, MANAGER_ROLES, assertTeamAccess, route } from "@/lib/api";
 
-export async function GET() {
-    try {
-        const session = await auth();
-        if (!session?.user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        const leaves = await prisma.leave.findMany({
-            orderBy: { startDate: "asc" },
-        });
-        return NextResponse.json(leaves);
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to fetch leaves" }, { status: 500 });
-    }
-}
+export const dynamic = "force-dynamic";
 
-export async function POST(req: Request) {
-    try {
-        const session = await auth();
-        if (!session?.user || !["ADMIN", "HR", "PM"].includes(session.user.role)) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-        const body = await req.json();
-        const leave = await prisma.leave.create({
-            data: {
-                id: body.id || new Date().getTime().toString(),
-                memberId: body.memberId,
-                startDate: body.startDate,
-                endDate: body.endDate,
-                type: body.type,
-            },
-        });
-        return NextResponse.json(leave, { status: 201 });
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to create leave" }, { status: 500 });
-    }
-}
+export const GET = route<{ id: string }>(async ({ params }) => {
+    const leave = await prisma.leave.findUnique({ where: { id: params.id } });
+    if (!leave) throw new HttpError(404, "Leave not found.");
+    return leave;
+});
+
+export const DELETE = route<{ id: string }>(async ({ user, params }) => {
+    if (params.id.startsWith("lr_")) throw new HttpError(409, "This leave comes from an approved leave request. Cancel it on the Leave page.");
+    const leave = await prisma.leave.findUnique({ where: { id: params.id }, include: { member: true } });
+    if (!leave) throw new HttpError(404, "Leave not found.");
+    await assertTeamAccess(user, leave.member.teamId);
+    await prisma.leave.delete({ where: { id: params.id } });
+    return { ok: true };
+}, { roles: MANAGER_ROLES });

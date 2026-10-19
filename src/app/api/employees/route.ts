@@ -1,56 +1,40 @@
-import { NextResponse } from "next/server";
+import { z } from "zod";
+import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { PEOPLE_ADMIN_ROLES, isPeopleAdmin, parseBody, route } from "@/lib/api";
+import { PASSWORD_MIN_LENGTH } from "@/lib/password";
+import { createEmployee, publicUser } from "@/services/users";
 
-export async function GET() {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const dynamic = "force-dynamic";
 
-    try {
-        const employees = await prisma.user.findMany({
-            include: {
-                profile: true
-            },
-            orderBy: {
-                name: 'asc'
-            }
-        });
-        return NextResponse.json(employees);
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to fetch employees" }, { status: 500 });
-    }
-}
+/** Directory. HR/ADMIN also get inactive people; everyone else sees active employees. */
+export const GET = route(async ({ user }) => {
+    const employees = await prisma.user.findMany({
+        where: isPeopleAdmin(user) ? {} : { isActive: true },
+        include: { profile: true, manager: { select: { id: true, name: true, email: true } } },
+        orderBy: { name: "asc" },
+    });
+    return employees.map(publicUser);
+});
 
-export async function POST(req: Request) {
-    const session = await auth();
-    if (!session || session.user.role !== "ADMIN") {
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+const schema = z.object({
+    email: z.string().email(),
+    name: z.string().trim().min(1).max(100),
+    role: z.nativeEnum(Role).default(Role.USER),
+    password: z.string().min(PASSWORD_MIN_LENGTH).max(200).optional().or(z.literal("")),
+    managerId: z.string().nullable().optional(),
+    employeeId: z.string().trim().max(40).optional().or(z.literal("")),
+    department: z.string().trim().max(100).nullable().optional(),
+    designation: z.string().trim().max(100).nullable().optional(),
+    phoneNumber: z.string().trim().max(40).nullable().optional(),
+});
 
-    try {
-        const body = await req.json();
-        const { email, name, role, department, designation, employeeId } = body;
-
-        const user = await prisma.user.create({
-            data: {
-                email,
-                name,
-                role,
-                profile: {
-                    create: {
-                        employeeId,
-                        department,
-                        designation,
-                    }
-                }
-            },
-            include: {
-                profile: true
-            }
-        });
-
-        return NextResponse.json(user);
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to create employee" }, { status: 500 });
-    }
-}
+/**
+ * Create an employee. Without a password they sign in with SSO or use "Forgot password"
+ * (the welcome email from the email connector links there).
+ */
+export const POST = route(async ({ req, user }) => {
+    const body = await parseBody(req, schema);
+    const created = await createEmployee(user, { ...body, password: body.password || null, employeeId: body.employeeId || null });
+    return Response.json(publicUser(created), { status: 201 });
+}, { roles: PEOPLE_ADMIN_ROLES });

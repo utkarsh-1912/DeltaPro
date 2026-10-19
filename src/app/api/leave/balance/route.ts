@@ -1,57 +1,16 @@
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { HttpError, canActOnUser, route } from "@/lib/api";
+import { ensureBalances } from "@/services/leave";
 
-const DEFAULT_BALANCES = [
-    { type: "CASUAL", total: 12 },
-    { type: "SICK", total: 10 },
-    { type: "EARNED", total: 15 }
-];
+export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+/** GET /api/leave/balance[?year=2026&userId=…] — creates default balances for the year on first read. */
+export const GET = route(async ({ req, user }) => {
+    const { searchParams } = new URL(req.url);
+    const year = Number(searchParams.get("year")) || new Date().getFullYear();
+    const userId = searchParams.get("userId") || user.id;
+    if (userId !== user.id && !(await canActOnUser(user, userId))) throw new HttpError(403, "Forbidden");
 
-        const year = new Date().getFullYear();
-
-        // 1. Fetch current balances
-        let balances = await prisma.leaveBalance.findMany({
-            where: {
-                userId: session.user.id,
-                year: year
-            }
-        });
-
-        // 2. If no balances exist, initialize with defaults
-        if (balances.length === 0) {
-            await Promise.all(
-                DEFAULT_BALANCES.map(b =>
-                    prisma.leaveBalance.create({
-                        data: {
-                            userId: session.user.id,
-                            type: b.type,
-                            total: b.total,
-                            available: b.total,
-                            used: 0,
-                            year: year
-                        }
-                    })
-                )
-            );
-
-            // Re-fetch after creation
-            balances = await prisma.leaveBalance.findMany({
-                where: {
-                    userId: session.user.id,
-                    year: year
-                }
-            });
-        }
-
-        return NextResponse.json(balances);
-    } catch (error) {
-        console.error("Leave Balance FETCH error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-    }
-}
+    await ensureBalances(userId, year);
+    return prisma.leaveBalance.findMany({ where: { userId, year }, orderBy: { type: "asc" } });
+});

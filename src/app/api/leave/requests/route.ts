@@ -1,87 +1,33 @@
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
-import { auth } from "@/auth";
-import { Role } from "@prisma/client";
+import { HttpError, canActOnUser, parseBody, route, scopeByUser } from "@/lib/api";
+import { createLeaveRequest } from "@/services/leave";
 
-export async function GET(req: Request) {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const dynamic = 'force-dynamic';
 
-        const { searchParams } = new URL(req.url);
-        const userId = searchParams.get("userId");
+export const GET = route(async ({ req, user }) => {
+    const userId = new URL(req.url).searchParams.get("userId");
+    if (userId && !(await canActOnUser(user, userId))) throw new HttpError(403, "Forbidden");
+    return prisma.leaveRequest.findMany({
+        where: userId ? { userId } : scopeByUser(user),
+        include: {
+            user: { select: { name: true, image: true, role: true } },
+            approver: { select: { name: true } }
+        },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+    });
+});
 
-        let where: any = {};
-        if (session.user.role === Role.ADMIN || session.user.role === Role.HR) {
-            if (userId) where.userId = userId;
-        } else if (session.user.role === Role.PM) {
-            // PM can see their own and their subordinates
-            where = {
-                OR: [
-                    { userId: session.user.id },
-                    { user: { managerId: session.user.id } }
-                ]
-            };
-        } else {
-            where.userId = session.user.id;
-        }
+const schema = z.object({
+    type: z.string(),
+    startDate: z.string(),
+    endDate: z.string(),
+    reason: z.string().max(1000).nullable().optional(),
+    isHalfDay: z.boolean().optional(),
+}).passthrough(); // `duration` from older clients is ignored; the server counts weekdays.
 
-        const requests = await prisma.leaveRequest.findMany({
-            where,
-            include: {
-                user: { select: { name: true, image: true, role: true } },
-                approver: { select: { name: true } }
-            },
-            orderBy: { createdAt: "desc" }
-        });
-
-        return NextResponse.json(requests);
-    } catch (error) {
-        console.error("Leave Request GET error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-    }
-}
-
-export async function POST(req: Request) {
-    try {
-        const session = await auth();
-        if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-        const body = await req.json();
-        const { type, startDate, endDate, reason, isHalfDay, duration } = body;
-
-        // 1. Check Balance
-        const balance = await prisma.leaveBalance.findUnique({
-            where: {
-                userId_type_year: {
-                    userId: session.user.id,
-                    type: type,
-                    year: new Date().getFullYear()
-                }
-            }
-        });
-
-        if (!balance || balance.available < duration) {
-            return NextResponse.json({ error: "Insufficient leave balance for this type." }, { status: 400 });
-        }
-
-        // 2. Create Request
-        const request = await prisma.leaveRequest.create({
-            data: {
-                userId: session.user.id,
-                type,
-                startDate: new Date(startDate),
-                endDate: new Date(endDate),
-                reason,
-                isHalfDay: isHalfDay || false,
-                duration: duration || 1.0,
-                status: "PENDING"
-            }
-        });
-
-        return NextResponse.json(request, { status: 201 });
-    } catch (error) {
-        console.error("Leave Request POST error:", error);
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
-    }
-}
+export const POST = route(async ({ req, user }) => {
+    const body = await parseBody(req, schema);
+    return Response.json(await createLeaveRequest(user, body), { status: 201 });
+});

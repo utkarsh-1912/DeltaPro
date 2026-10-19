@@ -39,7 +39,7 @@ export default function ContactPage() {
     <div className="min-h-screen bg-background relative overflow-hidden font-sans">
       {/* Dynamic Background Elements */}
       <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px]" />
-      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-500/5 rounded-full blur-[120px]" />
+      <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-signal/5 rounded-full blur-[120px]" />
 
       <div className="container mx-auto px-4 py-20 relative z-10">
         <motion.div
@@ -62,7 +62,7 @@ export default function ContactPage() {
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: 0.2 }}
-                  className="text-3xl md:text-5xl font-black tracking-tighter leading-none"
+                  className="text-3xl md:text-5xl font-semibold tracking-tight leading-none"
                 >
                   Let's Talk <span className="text-primary">Strategy.</span>
                 </motion.h1>
@@ -78,9 +78,9 @@ export default function ContactPage() {
 
               <div className="space-y-6">
                 {[
-                  { icon: Mail, label: "Email Support", value: "go.fixpert@gmail.com", color: "bg-blue-500/10 text-blue-500" },
-                  { icon: Globe, label: "Website", value: "utkristi-io.netlify.app", color: "bg-purple-500/10 text-purple-500" },
-                  { icon: MapPin, label: "Headquarters", value: "Remote First, Globally Enabled", color: "bg-emerald-500/10 text-emerald-600" }
+                  { icon: Mail, label: "Email Support", value: "go.fixpert@gmail.com", color: "bg-signal/10 text-signal" },
+                  { icon: Globe, label: "Website", value: "utkristi-io.netlify.app", color: "bg-signal/10 text-signal" },
+                  { icon: MapPin, label: "Headquarters", value: "Remote First, Globally Enabled", color: "bg-signal/10 text-emerald-600" }
                 ].map((item, i) => (
                   <motion.div
                     key={i}
@@ -93,7 +93,7 @@ export default function ContactPage() {
                       <item.icon className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="text-[10px] uppercase font-black tracking-widest text-muted-foreground mb-0.5">{item.label}</p>
+                      <p className="text-[10px] uppercase font-semibold tracking-[0.12em] text-muted-foreground mb-0.5 font-mono">{item.label}</p>
                       <p className="font-bold text-foreground">{item.value}</p>
                     </div>
                   </motion.div>
@@ -108,15 +108,15 @@ export default function ContactPage() {
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.3 }}
               >
-                <Card className="border-none shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] bg-background/60 backdrop-blur-3xl overflow-hidden rounded-[2.5rem]">
+                <Card className="border bg-background/60 overflow-hidden rounded-2xl">
                   <CardContent className="p-8 sm:p-12">
                     <form className="space-y-8" onSubmit={handleSubmit}>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
                         <div className="space-y-3">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1" htmlFor="name">Full Name</Label>
+                          <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1" htmlFor="name">Full Name</Label>
                           <Input
                             id="name"
-                            className="h-14 bg-muted/40 border-none rounded-2xl px-6 text-base font-medium focus:ring-2 ring-primary transition-all shadow-inner"
+                            className="h-14 bg-muted/40 border-none rounded-2xl px-6 text-base font-medium focus:ring-2 ring-primary transition-all "
                             placeholder="John Doe"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
@@ -124,11 +124,11 @@ export default function ContactPage() {
                           />
                         </div>
                         <div className="space-y-3">
-                          <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1" htmlFor="email">Email Address</Label>
+                          <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1" htmlFor="email">Email Address</Label>
                           <Input
                             id="email"
                             type="email"
-                            className="h-14 bg-muted/40 border-none rounded-2xl px-6 text-base font-medium focus:ring-2 ring-primary transition-all shadow-inner"
+                            className="h-14 bg-muted/40 border-none rounded-2xl px-6 text-base font-medium focus:ring-2 ring-primary transition-all "
                             placeholder="john@example.com"
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
@@ -138,10 +138,10 @@ export default function ContactPage() {
                       </div>
 
                       <div className="space-y-3">
-                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1" htmlFor="subject">Subject</Label>
+                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1" htmlFor="subject">Subject</Label>
                         <Input
                           id="subject"
-                          className="h-14 bg-muted/40 border-none rounded-2xl px-6 text-base font-medium focus:ring-2 ring-primary transition-all shadow-inner"
+                          className="h-14 bg-muted/40 border-none rounded-2xl px-6 text-base font-medium focus:ring-2 ring-primary transition-all "
                           placeholder="Project Collaboration"
                           value={subject}
                           onChange={(e) => setSubject(e.target.value)}
@@ -150,10 +150,10 @@ export default function ContactPage() {
                       </div>
 
                       <div className="space-y-3">
-                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1" htmlFor="message">Message Details</Label>
+                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1" htmlFor="message">Message Details</Label>
                         <Textarea
                           id="message"
-                          className="bg-muted/40 border-none rounded-3xl px-6 py-5 text-base font-medium focus:ring-2 ring-primary transition-all shadow-inner min-h-[160px] resize-none"
+                          className="bg-muted/40 border-none rounded-2xl px-6 py-5 text-base font-medium focus:ring-2 ring-primary transition-all min-h-[160px] resize-none"
                           placeholder="How can we help your team thrive?"
                           value={message}
                           onChange={(e) => setMessage(e.target.value)}
@@ -164,7 +164,7 @@ export default function ContactPage() {
                       <Button
                         disabled={isSubmitting}
                         type="submit"
-                        className="w-full h-16 rounded-2xl font-black text-lg transition-all group relative overflow-hidden shadow-xl hover:shadow-primary/20 active:scale-[0.98]"
+                        className="w-full h-16 rounded-2xl font-semibold text-lg transition-all group relative overflow-hidden shadow-lg hover:shadow-primary/20 active:scale-[0.98]"
                       >
                         <span className="relative z-10 flex items-center justify-center gap-2">
                           {isSubmitting ? "Sending Connection..." : "Initialize Message"}

@@ -20,12 +20,13 @@ import { useToast } from "@/hooks/use-toast";
 import { signIn } from "next-auth/react";
 import { ArrowLeft, Eye, EyeOff, CalendarCheck } from "lucide-react";
 import { motion } from "framer-motion";
+import { AuthPanel } from "@/components/auth-panel";
 
 const signupSchema = z
   .object({
     name: z.string().min(2, "Name must be at least 2 characters."),
     email: z.string().email("Invalid email address."),
-    password: z.string().min(6, "Password must be at least 6 characters."),
+    password: z.string().min(8, "Password must be at least 8 characters."),
     confirmPassword: z.string(),
   })
   .refine((data) => data.password === data.confirmPassword, {
@@ -53,6 +54,21 @@ export default function SignupPage() {
   const onSubmit = async (values: z.infer<typeof signupSchema>) => {
     setIsLoading(true);
     try {
+      const register = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: values.name, email: values.email, password: values.password }),
+      });
+      if (!register.ok) {
+        const data = await register.json().catch(() => ({}));
+        toast({
+          variant: "destructive",
+          title: "Signup Failed",
+          description: data.error || "Could not create the account. Please try again.",
+        });
+        return;
+      }
+
       const result = await signIn('credentials', {
         redirect: false,
         email: values.email,
@@ -62,9 +78,10 @@ export default function SignupPage() {
       if (result?.error) {
         toast({
           variant: "destructive",
-          title: "Signup Failed",
-          description: "An expected error occurred or the email is already in use.",
+          title: "Account created",
+          description: "Your account exists but sign-in failed. Try signing in from the login page.",
         });
+        router.push("/login");
       } else {
         toast({
           title: "Account Created",
@@ -86,32 +103,8 @@ export default function SignupPage() {
 
   return (
     <div className="min-h-screen flex w-full bg-background relative overflow-hidden">
-      {/* Decorative background blurs */}
-      <div className="absolute top-0 right-0 -m-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-[-10%] w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex-1 hidden lg:flex flex-col justify-center items-center bg-slate-gradient p-12 relative overflow-hidden">
-        {/* Subtle overlay */}
-        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay pointer-events-none"></div>
-
-        <motion.div
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="z-10 text-white max-w-lg"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/20">
-              <CalendarCheck className="h-8 w-8 text-white" />
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight">DeltaPro</h1>
-          </div>
-          <h2 className="text-4xl font-extrabold mb-6 leading-tight">Join the Roster.</h2>
-          <p className="text-slate-300 text-lg leading-relaxed">
-            Create an account to view your shifts, manage your schedule, and collaborate with your team in real-time.
-          </p>
-        </motion.div>
-      </div>
+      <AuthPanel title="Start running people operations properly." body="Create your account. Your administrator can connect SSO, Slack, calendars and your HR system later." />
 
       <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10 w-full max-w-md lg:max-w-none mx-auto lg:mx-0">
         <motion.div
@@ -126,7 +119,7 @@ export default function SignupPage() {
           </Link>
 
           <div className="mb-8">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2">Create an account</h2>
+            <h2 className="page-title mb-3">Create an account</h2>
             <p className="text-muted-foreground">Enter your information to get started.</p>
           </div>
 

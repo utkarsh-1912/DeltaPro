@@ -164,7 +164,7 @@ function AnalyticsDashboard() {
         >
             <motion.div variants={itemVariants}>
                 <Card className="glass-card overflow-hidden border-border/50">
-                    <CardHeader className="bg-gradient-to-r from-primary/10 to-transparent border-b border-border/50 pb-6">
+                    <CardHeader className="bg-secondary/40 border-b border-border/50 pb-6">
                         <CardTitle className="text-2xl">Analytics Dashboard</CardTitle>
                         <CardDescription>
                             Visual insights into your team's scheduling metrics.

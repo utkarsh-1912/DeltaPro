@@ -20,6 +20,8 @@ import { useToast } from "@/hooks/use-toast";
 import { ArrowLeft, Eye, EyeOff, CalendarCheck } from "lucide-react";
 import { signIn } from "next-auth/react";
 import { motion } from "framer-motion";
+import { AuthPanel } from "@/components/auth-panel";
+import { SsoButtons } from "@/components/sso-buttons";
 
 const loginSchema = z.object({
   email: z.string().email("Invalid email address."),
@@ -56,7 +58,8 @@ export default function LoginPage() {
           description: "Invalid email or password. Please try again.",
         });
       } else {
-        router.push("/dashboard");
+        const from = new URLSearchParams(window.location.search).get("from");
+        router.push(from && from.startsWith("/") && !from.startsWith("//") ? from : "/dashboard");
       }
     } catch (error) {
       console.error("Login Error:", error);
@@ -72,41 +75,8 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex w-full bg-background relative overflow-hidden">
-      {/* Decorative background blurs */}
-      <div className="absolute top-0 right-0 -m-32 w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute bottom-0 left-[-10%] w-96 h-96 bg-primary/5 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="flex-1 hidden lg:flex flex-col justify-center items-center bg-slate-gradient p-12 relative overflow-hidden">
-        {/* Subtle overlay lines or patterns could go here */}
-        <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay pointer-events-none"></div>
-
-        <motion.div
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, ease: "easeOut" }}
-          className="z-10 text-white max-w-lg"
-        >
-          <div className="flex items-center gap-3 mb-8">
-            <div className="bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/20">
-              <CalendarCheck className="h-8 w-8 text-white" />
-            </div>
-            <h1 className="text-4xl font-bold tracking-tight">DeltaPro</h1>
-          </div>
-          <h2 className="text-4xl font-extrabold mb-6 leading-tight">Master Your<br />Team's Schedule.</h2>
-          <p className="text-slate-300 text-lg leading-relaxed">
-            Generate balanced rotas instantly, manage team shifts with ease, and handle time-offs effortlessly on a highly configurable dashboard.
-          </p>
-
-          <div className="mt-12 flex items-center gap-4">
-            <div className="flex -space-x-3">
-              <div className="w-10 h-10 rounded-full bg-slate-700 border-2 border-slate-900 flex items-center justify-center text-xs font-medium">JD</div>
-              <div className="w-10 h-10 rounded-full bg-primary/80 border-2 border-slate-900 flex items-center justify-center text-xs font-medium">AM</div>
-              <div className="w-10 h-10 rounded-full bg-slate-600 border-2 border-slate-900 flex items-center justify-center text-xs font-medium">SK</div>
-            </div>
-            <p className="text-sm text-slate-400 font-medium">Trusted by agile teams</p>
-          </div>
-        </motion.div>
-      </div>
+      <AuthPanel title="Your workforce, in one place." body="Sign in to clock in, plan leave, publish rotas and keep your team in sync." />
 
       <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 relative z-10 w-full max-w-md lg:max-w-none mx-auto lg:mx-0">
         <motion.div
@@ -121,7 +91,7 @@ export default function LoginPage() {
           </Link>
 
           <div className="mb-8">
-            <h2 className="text-3xl font-bold tracking-tight text-foreground mb-2">Welcome back</h2>
+            <h2 className="page-title mb-3">Welcome back</h2>
             <p className="text-muted-foreground">Sign in to your account to continue</p>
           </div>
 
@@ -189,6 +159,8 @@ export default function LoginPage() {
               </Button>
             </form>
           </Form>
+
+          <SsoButtons disabled={isLoading} />
 
           <div className="mt-8 text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}

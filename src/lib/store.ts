@@ -13,45 +13,61 @@ const SHIFT_COLORS = [
   "var(--chart-5)",
 ];
 
-// -------- DB sync helpers (fire-and-forget) --------
-async function dbPost(path: string, body: any) {
+// -------- DB sync helpers --------
+// The store updates the UI first; these persist the change and tell the user when the
+// server refused it (validation, permissions), so a reload never silently loses edits.
+async function sync(method: "POST" | "PUT" | "DELETE", path: string, body?: any): Promise<boolean> {
   try {
-    await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  } catch (e) { console.error("DB sync POST failed:", path, e); }
+    const res = await fetch(path, {
+      method,
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (res.ok) return true;
+    const data = await res.json().catch(() => ({}));
+    toast({
+      variant: "destructive",
+      title: "Change not saved",
+      description: `${data.error || `The server returned ${res.status}.`} Reload the page to see the saved data.`,
+    });
+  } catch (e) {
+    console.error(`DB sync ${method} failed:`, path, e);
+    toast({ variant: "destructive", title: "Change not saved", description: "Could not reach the server. Check your connection and reload." });
+  }
+  return false;
 }
-async function dbPut(path: string, body: any) {
-  try {
-    await fetch(path, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  } catch (e) { console.error("DB sync PUT failed:", path, e); }
-}
-async function dbDelete(path: string) {
-  try {
-    await fetch(path, { method: "DELETE" });
-  } catch (e) { console.error("DB sync DELETE failed:", path, e); }
-}
+const dbPost = (path: string, body: any) => sync("POST", path, body);
+const dbPut = (path: string, body: any) => sync("PUT", path, body);
+const dbDelete = (path: string) => sync("DELETE", path);
 
 // -------- Hydration from DB --------
 export async function hydrateFromDB(): Promise<Partial<AppState>> {
   try {
-    const [teamsRes, membersRes, shiftsRes, leavesRes, rotasRes, weekendRes, attendanceRes] = await Promise.all([
-      fetch("/api/teams"),
-      fetch("/api/members"),
-      fetch("/api/shifts"),
-      fetch("/api/leaves"),
-      fetch("/api/rotas"),
-      fetch("/api/weekend-rotas"),
-      fetch("/api/attendance"),
+    const get = async (path: string) => {
+      const res = await fetch(path);
+      return res.ok ? res.json() : undefined;
+    };
+    const [teams, teamMembers, shifts, leave, generationHistory, weekendRotas, attendance, employees] = await Promise.all([
+      get("/api/teams"),
+      get("/api/members"),
+      get("/api/shifts"),
+      get("/api/leaves"),
+      get("/api/rotas"),
+      get("/api/weekend-rotas"),
+      get("/api/attendance"),
+      get("/api/employees"),
     ]);
-    const [teams, teamMembers, shifts, leave, generationHistory, weekendRotas, attendance] = await Promise.all([
-      teamsRes.json(),
-      membersRes.json(),
-      shiftsRes.json(),
-      leavesRes.json(),
-      rotasRes.json(),
-      weekendRes.json(),
-      attendanceRes.json(),
-    ]);
-    return { teams, teamMembers, shifts, leave, generationHistory, weekendRotas, attendance };
+    const state: Partial<AppState> = {};
+    if (Array.isArray(teams)) state.teams = teams;
+    if (Array.isArray(teamMembers)) state.teamMembers = teamMembers;
+    if (Array.isArray(shifts)) state.shifts = shifts;
+    if (Array.isArray(leave)) state.leave = leave;
+    if (Array.isArray(generationHistory)) state.generationHistory = generationHistory;
+    if (Array.isArray(weekendRotas)) state.weekendRotas = weekendRotas;
+    if (attendance?.logs) state.attendance = attendance.logs;
+    // Users feed the PM pickers in team management.
+    if (Array.isArray(employees)) state.users = employees.map((e: any) => ({ id: e.id, name: e.name ?? e.email, email: e.email, role: e.role }));
+    return state;
   } catch (e) {
     console.error("Failed to hydrate from DB:", e);
     return {};

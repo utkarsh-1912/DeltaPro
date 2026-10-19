@@ -16,7 +16,7 @@ export default function TermsPage() {
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Background Orbs */}
       <div className="absolute top-0 -right-4 w-72 h-72 bg-primary/10 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob" />
-      <div className="absolute bottom-0 -left-4 w-72 h-72 bg-purple-500/10 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000" />
+      <div className="absolute bottom-0 -left-4 w-72 h-72 bg-signal/10 rounded-full mix-blend-multiply filter blur-3xl opacity-30 animate-blob animation-delay-2000" />
 
       <div className="container mx-auto px-4 py-20 relative z-10">
         <motion.div
@@ -35,19 +35,19 @@ export default function TermsPage() {
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
-              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-black uppercase tracking-widest"
+              className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold font-mono uppercase tracking-[0.12em]"
             >
               <FileCheck className="h-3 w-3" /> Agreement
             </motion.div>
-            <h1 className="text-3xl md:text-5xl font-black tracking-tight leading-none">
+            <h1 className="text-3xl md:text-5xl font-semibold tracking-tight leading-none">
               Terms of <span className="text-primary">Service.</span>
             </h1>
-            <p className="text-muted-foreground font-medium uppercase tracking-widest text-xs">
+            <p className="text-muted-foreground font-medium font-mono uppercase tracking-[0.12em] text-xs">
               Last Updated: {lastUpdated}
             </p>
           </header>
 
-          <Card className="border-none shadow-2xl bg-background/50 backdrop-blur-xl overflow-hidden rounded-[2.5rem]">
+          <Card className="border bg-background/50 overflow-hidden rounded-2xl">
             <CardContent className="p-8 md:p-12 space-y-12">
 
               <section className="space-y-4">
@@ -55,7 +55,7 @@ export default function TermsPage() {
                   <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
                     <Gavel className="h-5 w-5" />
                   </div>
-                  <h2 className="text-2xl font-black tracking-tight">System Access</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight">System Access</h2>
                 </div>
                 <p className="text-muted-foreground leading-relaxed font-medium">
                   Welcome to DeltaPro by <Link href="https://utkristi-io.netlify.app" className="text-primary hover:underline">Utkristi.io</Link>. This application is an enterprise-grade demonstration platform. By accessing our services, you agree to comply with our operational framework and security protocols.
@@ -63,8 +63,8 @@ export default function TermsPage() {
               </section>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                <div className="p-6 rounded-3xl bg-muted/30 border border-border/40 space-y-4">
-                  <h3 className="text-lg font-black flex items-center gap-2">
+                <div className="p-6 rounded-2xl bg-muted/30 border border-border/40 space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2">
                     <Scale className="h-4 w-4 text-primary" /> User Obligations
                   </h3>
                   <p className="text-sm text-muted-foreground font-medium leading-relaxed">
@@ -72,8 +72,8 @@ export default function TermsPage() {
                   </p>
                 </div>
 
-                <div className="p-6 rounded-3xl bg-muted/30 border border-border/40 space-y-4">
-                  <h3 className="text-lg font-black flex items-center gap-2 text-amber-600">
+                <div className="p-6 rounded-2xl bg-muted/30 border border-border/40 space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 text-amber-600">
                     <AlertTriangle className="h-4 w-4" /> Usage Rights
                   </h3>
                   <p className="text-sm text-muted-foreground font-medium leading-relaxed">
@@ -87,7 +87,7 @@ export default function TermsPage() {
                   <div className="h-10 w-10 rounded-xl bg-muted flex items-center justify-center">
                     <RefreshCcw className="h-5 w-5" />
                   </div>
-                  <h2 className="text-2xl font-black tracking-tight">Modifications</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight">Modifications</h2>
                 </div>
                 <p className="text-muted-foreground leading-relaxed font-medium">
                   DeltaPro is rapidly evolving. We reserve the right to update these terms to reflect new enterprise capabilities or regulatory requirements. Continued use of the platform after updates constitutes acceptance of the refined framework.
@@ -95,11 +95,11 @@ export default function TermsPage() {
               </section>
 
               <footer className="pt-8 border-t border-border/40 flex flex-col sm:flex-row items-center justify-between gap-4">
-                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                <p className="text-xs font-medium text-muted-foreground font-mono uppercase tracking-[0.12em]">
                   Enterprise Resilience Framework
                 </p>
                 <div className="flex gap-4">
-                  <Link href="/privacy" className="text-xs font-black uppercase tracking-widest text-emerald-600 hover:underline">
+                  <Link href="/privacy" className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-emerald-600 hover:underline">
                     Privacy Policy
                   </Link>
                 </div>

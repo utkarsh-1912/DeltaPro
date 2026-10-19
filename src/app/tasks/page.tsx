@@ -17,8 +17,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 
 const STATUS_COLUMNS = [
-    { id: "TODO", label: "To Do", icon: Circle, color: "text-slate-400" },
-    { id: "IN_PROGRESS", label: "In Progress", icon: Clock, color: "text-blue-500" },
+    { id: "TODO", label: "To Do", icon: Circle, color: "text-muted-foreground" },
+    { id: "IN_PROGRESS", label: "In Progress", icon: Clock, color: "text-signal" },
     { id: "REVIEW", label: "In Review", icon: AlertCircle, color: "text-amber-500" },
     { id: "DONE", label: "Done", icon: CheckCircle2, color: "text-emerald-500" },
 ];
@@ -28,8 +28,8 @@ const PRIORITIES = ["URGENT", "HIGH", "MEDIUM", "LOW"] as const;
 const PRIORITY_ICONS = {
     URGENT: { icon: ChevronsUp, color: "text-rose-600", label: "Urgent" },
     HIGH: { icon: ChevronUp, color: "text-amber-600", label: "High" },
-    MEDIUM: { icon: ChevronUp, color: "text-blue-600", label: "Medium" },
-    LOW: { icon: ChevronDown, color: "text-slate-500", label: "Low" },
+    MEDIUM: { icon: ChevronUp, color: "text-signal", label: "Medium" },
+    LOW: { icon: ChevronDown, color: "text-muted-foreground", label: "Low" },
 };
 
 export default function TasksPage() {
@@ -264,7 +264,7 @@ export default function TasksPage() {
             <div className="flex flex-col gap-4 shrink-0 px-1">
                 <div className="flex items-center justify-between">
                     <div className="flex flex-col">
-                        <h1 className="text-2xl font-black tracking-tight flex items-center gap-2">
+                        <h1 className="page-title flex items-center gap-2">
                             Task Insights
                         </h1>
                         <nav className="flex items-center gap-2 text-xs font-bold text-muted-foreground mt-1">
@@ -275,7 +275,7 @@ export default function TasksPage() {
                     </div>
                     <div className="flex items-center gap-3">
                         <Button
-                            className="rounded-xl bg-primary shadow-lg shadow-primary/20 hover:scale-[1.02] transition-all font-black h-10"
+                            className="rounded-xl bg-primary hover:scale-[1.02] transition-all font-semibold h-10"
                             onClick={() => setIsCreateOpen(true)}
                         >
                             <Plus className="mr-1.5 h-4 w-4" /> Create
@@ -287,7 +287,7 @@ export default function TasksPage() {
                 <div className="flex items-center gap-2 overflow-x-auto pb-1">
                     <div className="flex items-center gap-2 bg-muted/20 px-3 py-1.5 rounded-xl border">
                         <Filter className="h-3.5 w-3.5 opacity-50" />
-                        <span className="text-[10px] font-black uppercase tracking-widest opacity-40 mr-2">Filter</span>
+                        <span className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em] opacity-40 mr-2">Filter</span>
 
                         {/* Assignee Filter */}
                         <DropdownMenu>
@@ -296,7 +296,7 @@ export default function TasksPage() {
                                     Assignee {filterAssignees.length > 0 && `(${filterAssignees.length})`}
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-48 rounded-xl shadow-2xl border-none">
+                            <DropdownMenuContent className="w-48 rounded-xl shadow-lg border-none">
                                 {employees.map(e => (
                                     <DropdownMenuItem
                                         key={e.id}
@@ -315,7 +315,7 @@ export default function TasksPage() {
                                 {filterAssignees.length > 0 && (
                                     <>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setFilterAssignees([])} className="justify-center text-[10px] font-black uppercase tracking-widest text-primary py-2 cursor-pointer">Clear</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setFilterAssignees([])} className="justify-center text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-primary py-2 cursor-pointer">Clear</DropdownMenuItem>
                                     </>
                                 )}
                             </DropdownMenuContent>
@@ -328,7 +328,7 @@ export default function TasksPage() {
                                     Priority {filterPriorities.length > 0 && `(${filterPriorities.length})`}
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-48 rounded-xl shadow-2xl border-none">
+                            <DropdownMenuContent className="w-48 rounded-xl shadow-lg border-none">
                                 {PRIORITIES.map(p => (
                                     <DropdownMenuItem
                                         key={p}
@@ -347,7 +347,7 @@ export default function TasksPage() {
                                 {filterPriorities.length > 0 && (
                                     <>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setFilterPriorities([])} className="justify-center text-[10px] font-black uppercase tracking-widest text-primary py-2 cursor-pointer">Clear</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setFilterPriorities([])} className="justify-center text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-primary py-2 cursor-pointer">Clear</DropdownMenuItem>
                                     </>
                                 )}
                             </DropdownMenuContent>
@@ -360,7 +360,7 @@ export default function TasksPage() {
                                     Project {filterProjects.length > 0 && `(${filterProjects.length})`}
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent className="w-48 rounded-xl shadow-2xl border-none">
+                            <DropdownMenuContent className="w-48 rounded-xl shadow-lg border-none">
                                 {projects.map(p => (
                                     <DropdownMenuItem
                                         key={p.id}
@@ -379,7 +379,7 @@ export default function TasksPage() {
                                 {filterProjects.length > 0 && (
                                     <>
                                         <DropdownMenuSeparator />
-                                        <DropdownMenuItem onClick={() => setFilterProjects([])} className="justify-center text-[10px] font-black uppercase tracking-widest text-primary py-2 cursor-pointer">Clear</DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => setFilterProjects([])} className="justify-center text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-primary py-2 cursor-pointer">Clear</DropdownMenuItem>
                                     </>
                                 )}
                             </DropdownMenuContent>
@@ -402,14 +402,14 @@ export default function TasksPage() {
             <div className="flex-1 overflow-x-auto overflow-y-auto pb-10">
                 <div className="min-w-[1000px] h-full flex flex-col">
                     {/* Status Header */}
-                    <div className="grid grid-cols-[120px_1fr_1fr_1fr_1fr] gap-4 mb-2 sticky top-0 z-20 bg-background/95 backdrop-blur-sm py-2 px-2 border-b">
-                        <div className="flex items-center justify-center font-black text-[10px] uppercase tracking-widest text-muted-foreground opacity-50">
+                    <div className="grid grid-cols-[120px_1fr_1fr_1fr_1fr] gap-4 mb-2 sticky top-0 z-20 bg-background/95 py-2 px-2 border-b">
+                        <div className="flex items-center justify-center font-semibold text-[10px] font-mono uppercase tracking-[0.12em] text-muted-foreground opacity-50">
                             Priority
                         </div>
                         {STATUS_COLUMNS.map(column => (
                             <div key={column.id} className="flex items-center gap-2 px-3 py-1 bg-muted/20 rounded-lg">
                                 <column.icon className={cn("h-4 w-4", column.color)} />
-                                <span className="text-[10px] font-black uppercase tracking-[0.15em] text-muted-foreground">{column.label}</span>
+                                <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-muted-foreground font-mono">{column.label}</span>
                                 <Badge variant="secondary" className="ml-auto h-5 px-1.5 text-[10px] font-bold bg-muted/50">{filteredTasks.filter(t => t.status === column.id).length}</Badge>
                             </div>
                         ))}
@@ -421,9 +421,9 @@ export default function TasksPage() {
                             const pInfo = PRIORITY_ICONS[priority];
                             return (
                                 <div key={priority} className="grid grid-cols-[120px_1fr_1fr_1fr_1fr] gap-4 min-h-[140px]">
-                                    <div className="flex flex-col items-center justify-center gap-2 bg-muted/10 rounded-2xl border-2 border-transparent hover:border-muted/30 transition-all group">
+                                    <div className="flex flex-col items-center justify-center gap-2 bg-muted/10 rounded-2xl border border-transparent hover:border-muted/30 transition-all group">
                                         <pInfo.icon className={cn("h-6 w-6", pInfo.color)} />
-                                        <span className="text-[10px] font-black uppercase tracking-[0.2em]">{priority}</span>
+                                        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] font-mono">{priority}</span>
                                         <span className="text-[9px] font-bold text-muted-foreground opacity-40">
                                             {filteredTasks.filter(t => t.priority === priority).length} Tasks
                                         </span>
@@ -432,7 +432,7 @@ export default function TasksPage() {
                                     {STATUS_COLUMNS.map((column) => (
                                         <div
                                             key={`${priority}-${column.id}`}
-                                            className="flex flex-col gap-3 p-2 rounded-2xl bg-muted/5 border-2 border-dashed border-border/10 hover:bg-muted/10 transition-colors group relative"
+                                            className="flex flex-col gap-3 p-2 rounded-2xl bg-muted/5 border border-dashed border-border/10 hover:bg-muted/10 transition-colors group relative"
                                             onDragOver={handleDragOver}
                                             onDrop={(e) => handleDrop(e, column.id, priority)}
                                         >
@@ -444,13 +444,13 @@ export default function TasksPage() {
                                                             key={task.id}
                                                             layout
                                                             draggable
-                                                            onDragStart={(e) => handleDragStart(e, task.id)}
+                                                            onDragStart={(e) => handleDragStart(e as unknown as React.DragEvent, task.id)}
                                                             onClick={(e) => { e.stopPropagation(); openTaskDetail(task); }}
                                                         >
                                                             <Card className="shadow-sm hover:shadow-lg hover:ring-2 ring-primary/20 transition-all border border-border/40 cursor-grab active:cursor-grabbing rounded-xl bg-card overflow-hidden group/card relative">
                                                                 <div className="p-3 space-y-3">
                                                                     <div className="flex items-center justify-between">
-                                                                        <span className="text-[9px] font-black text-muted-foreground uppercase opacity-40 tracking-tighter">
+                                                                        <span className="text-[9px] font-semibold text-muted-foreground uppercase opacity-40 tracking-tight font-mono">
                                                                             {task.project?.key}-{task.key}
                                                                         </span>
                                                                         <DropdownMenu>
@@ -459,8 +459,8 @@ export default function TasksPage() {
                                                                                     <UserPlus className="h-3 w-3" />
                                                                                 </Button>
                                                                             </DropdownMenuTrigger>
-                                                                            <DropdownMenuContent className="w-56 rounded-xl shadow-2xl border-none p-2">
-                                                                                <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest px-3 py-2 opacity-50">Assign To</DropdownMenuLabel>
+                                                                            <DropdownMenuContent className="w-56 rounded-xl shadow-lg border-none p-2">
+                                                                                <DropdownMenuLabel className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em] px-3 py-2 opacity-50">Assign To</DropdownMenuLabel>
                                                                                 <DropdownMenuSeparator />
                                                                                 {employees.map(emp => (
                                                                                     <DropdownMenuItem key={emp.id} onClick={(e) => { e.stopPropagation(); handleUpdateTask(task.id, { assigneeId: emp.id }); }} className="rounded-lg gap-3 px-3 py-2 cursor-pointer">
@@ -483,7 +483,7 @@ export default function TasksPage() {
                                                                     <div className="flex items-center justify-between pt-1">
                                                                         <div className="flex items-center gap-1.5">
                                                                             <pInfo.icon className={cn("h-3 w-3", pInfo.color)} />
-                                                                            <Badge variant="outline" className="text-[8px] font-black uppercase tracking-tight py-0 px-1 border-muted-foreground/10">{task.type}</Badge>
+                                                                            <Badge variant="outline" className="text-[8px] font-semibold uppercase tracking-tight py-0 px-1 border-muted-foreground/10 font-mono">{task.type}</Badge>
                                                                         </div>
                                                                         <Avatar className="h-5 w-5 bg-muted">
                                                                             <AvatarImage src={task.assignee?.image} />
@@ -519,48 +519,48 @@ export default function TasksPage() {
 
             {/* CREATE MODAL */}
             <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                <DialogContent className="sm:max-w-[500px] border-none shadow-2xl bg-background/95 backdrop-blur-xl rounded-[2rem] p-8">
+                <DialogContent className="sm:max-w-[500px] border bg-background/95 rounded-2xl p-8">
                     <form onSubmit={handleCreateTask}>
                         <DialogHeader className="mb-6">
-                            <DialogTitle className="text-2xl font-black">New Work Item</DialogTitle>
-                            <DialogDescription className="font-medium">Directly adding to <span className="text-primary font-black uppercase">{newTask.priority}</span> / <span className="text-primary font-black uppercase">{newTask.status}</span></DialogDescription>
+                            <DialogTitle className="text-2xl font-semibold">New Work Item</DialogTitle>
+                            <DialogDescription className="font-medium">Directly adding to <span className="text-primary font-semibold uppercase font-mono">{newTask.priority}</span> / <span className="text-primary font-semibold uppercase font-mono">{newTask.status}</span></DialogDescription>
                         </DialogHeader>
                         <div className="space-y-6">
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Summary</Label>
+                                <Label className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Summary</Label>
                                 <Input required placeholder="Issue title..." value={newTask.title} onChange={(e) => setNewTask({ ...newTask, title: e.target.value })} className="h-12 bg-muted/40 border-none rounded-xl px-4 font-bold focus:ring-2 ring-primary" />
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Project</Label>
+                                    <Label className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Project</Label>
                                     <Select value={newTask.projectId} onValueChange={(v) => setNewTask({ ...newTask, projectId: v })}>
                                         <SelectTrigger className="h-12 bg-muted/40 border-none rounded-xl">
                                             <SelectValue placeholder="Project" />
                                         </SelectTrigger>
-                                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                                        <SelectContent className="rounded-xl border">
                                             {projects.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Priority</Label>
+                                    <Label className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Priority</Label>
                                     <Select value={newTask.priority} onValueChange={(v) => setNewTask({ ...newTask, priority: v })}>
                                         <SelectTrigger className="h-12 bg-muted/40 border-none rounded-xl">
                                             <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent className="rounded-xl border-none shadow-2xl">
+                                        <SelectContent className="rounded-xl border">
                                             {PRIORITIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Assign To</Label>
+                                <Label className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Assign To</Label>
                                 <Select value={newTask.assigneeId} onValueChange={(v) => setNewTask({ ...newTask, assigneeId: v })}>
                                     <SelectTrigger className="h-12 bg-muted/40 border-none rounded-xl">
                                         <SelectValue placeholder="Unassigned" />
                                     </SelectTrigger>
-                                    <SelectContent className="rounded-xl border-none shadow-2xl">
+                                    <SelectContent className="rounded-xl border">
                                         {employees.map(e => <SelectItem key={e.id} value={e.id}>{e.name}</SelectItem>)}
                                     </SelectContent>
                                 </Select>
@@ -568,7 +568,7 @@ export default function TasksPage() {
                         </div>
                         <DialogFooter className="mt-8 gap-3 sm:justify-end">
                             <Button type="button" variant="ghost" className="rounded-xl font-bold" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                            <Button type="submit" disabled={isCreating} className="rounded-xl font-black h-12 px-8">
+                            <Button type="submit" disabled={isCreating} className="rounded-xl font-semibold h-12 px-8">
                                 {isCreating ? <Loader2 className="animate-spin" /> : "Create Task"}
                             </Button>
                         </DialogFooter>
@@ -582,7 +582,7 @@ export default function TasksPage() {
                 if (!open) setIsModalEditing(false);
             }}>
                 {selectedTask && (
-                    <DialogContent className="sm:max-w-[950px] h-[90vh] p-0 overflow-hidden border-none shadow-3xl bg-background rounded-[2rem]">
+                    <DialogContent className="sm:max-w-[950px] h-[90vh] p-0 overflow-hidden border bg-background rounded-2xl">
                         <DialogTitle className="sr-only">Task Details - {selectedTask.title}</DialogTitle>
                         <DialogDescription className="sr-only">View and manage task details, comments, and status.</DialogDescription>
 
@@ -591,11 +591,11 @@ export default function TasksPage() {
                             <div className="flex-1 overflow-y-auto p-10 border-r border-border/30 scrollbar-thin">
                                 <div className="flex items-center justify-between mb-8">
                                     <div className="flex items-center gap-3">
-                                        <Badge className="text-[10px] font-black bg-primary/5 text-primary border-primary/10 tracking-[0.2em] uppercase px-3 py-1">
+                                        <Badge className="text-[10px] font-semibold bg-primary/5 text-primary border-primary/10 tracking-[0.2em] uppercase px-3 py-1 font-mono">
                                             {selectedTask.project?.key}-{selectedTask.key}
                                         </Badge>
                                         <div className="h-1 w-1 rounded-full bg-border" />
-                                        <Badge variant="secondary" className="text-[10px] font-black uppercase tracking-widest bg-muted/50 px-3 py-1">
+                                        <Badge variant="secondary" className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em] bg-muted/50 px-3 py-1">
                                             {selectedTask.type}
                                         </Badge>
                                     </div>
@@ -608,12 +608,12 @@ export default function TasksPage() {
                                                 }}>
                                                     Cancel
                                                 </Button>
-                                                <Button size="sm" className="rounded-xl font-black px-6 shadow-lg shadow-primary/20" onClick={handleModalSave} disabled={isUpdating}>
+                                                <Button size="sm" className="rounded-xl font-semibold px-6 " onClick={handleModalSave} disabled={isUpdating}>
                                                     {isUpdating ? <Loader2 className="h-3 w-3 animate-spin" /> : "Save Changes"}
                                                 </Button>
                                             </>
                                         ) : (
-                                            <Button variant="outline" size="sm" className="rounded-xl font-black px-6 hover:bg-primary/5 hover:text-primary transition-all" onClick={() => setIsModalEditing(true)}>
+                                            <Button variant="outline" size="sm" className="rounded-xl font-semibold px-6 hover:bg-primary/5 hover:text-primary transition-all" onClick={() => setIsModalEditing(true)}>
                                                 Edit Details
                                             </Button>
                                         )}
@@ -627,10 +627,10 @@ export default function TasksPage() {
                                             <Input
                                                 value={editingTask.title}
                                                 onChange={(e) => setEditingTask({ ...editingTask, title: e.target.value })}
-                                                className="text-2xl font-black tracking-tight bg-muted/20 border-none rounded-xl h-14 px-4 focus:ring-2 ring-primary/20"
+                                                className="text-2xl font-semibold tracking-tight bg-muted/20 border-none rounded-xl h-14 px-4 focus:ring-2 ring-primary/20"
                                             />
                                         ) : (
-                                            <h2 className="text-3xl font-black tracking-tight leading-tight px-1">
+                                            <h2 className="text-3xl font-semibold tracking-tight leading-tight px-1">
                                                 {selectedTask.title}
                                             </h2>
                                         )}
@@ -639,17 +639,17 @@ export default function TasksPage() {
                                     {/* Description Section */}
                                     <div className="space-y-4">
                                         <div className="flex items-center justify-between">
-                                            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Description</Label>
+                                            <Label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground ml-1 font-mono">Description</Label>
                                         </div>
                                         {isModalEditing ? (
                                             <Textarea
                                                 value={editingTask.description || ""}
                                                 onChange={(e) => setEditingTask({ ...editingTask, description: e.target.value })}
-                                                className="min-h-[250px] p-6 bg-muted/20 border-none rounded-[1.5rem] text-sm font-medium leading-[1.8] focus:ring-2 ring-primary/20"
+                                                className="min-h-[250px] p-6 bg-muted/20 border-none rounded-2xl text-sm font-medium leading-[1.8] focus:ring-2 ring-primary/20"
                                                 placeholder="Add a detailed description..."
                                             />
                                         ) : (
-                                            <div className="min-h-[150px] p-6 bg-muted/5 rounded-[1.5rem] text-sm font-medium leading-[1.8] text-foreground/80 whitespace-pre-wrap">
+                                            <div className="min-h-[150px] p-6 bg-muted/5 rounded-2xl text-sm font-medium leading-[1.8] text-foreground/80 whitespace-pre-wrap">
                                                 {selectedTask.description || <span className="text-muted-foreground italic opacity-50">No description provided for this task.</span>}
                                             </div>
                                         )}
@@ -658,16 +658,16 @@ export default function TasksPage() {
                                     {/* Activity Section */}
                                     <div className="space-y-8 pt-10 border-t border-border/40">
                                         <div className="flex items-center justify-between">
-                                            <h4 className="text-[11px] font-black uppercase tracking-[0.2em] flex items-center gap-3">
+                                            <h4 className="text-[11px] font-semibold uppercase tracking-[0.2em] flex items-center gap-3 font-mono">
                                                 <MessageSquare className="h-4 w-4 text-primary" /> Activity Feed
                                             </h4>
-                                            <Badge variant="outline" className="text-[9px] font-black opacity-40">{selectedTask.taskComments?.length || 0} Comments</Badge>
+                                            <Badge variant="outline" className="text-[9px] font-semibold opacity-40">{selectedTask.taskComments?.length || 0} Comments</Badge>
                                         </div>
 
                                         {/* New Comment Input */}
                                         <div className="flex items-start gap-4">
                                             <Avatar className="h-10 w-10 border-2 border-background shadow-sm">
-                                                <AvatarFallback className="text-[10px] font-black bg-primary/10 text-primary">ME</AvatarFallback>
+                                                <AvatarFallback className="text-[10px] font-semibold bg-primary/10 text-primary">ME</AvatarFallback>
                                             </Avatar>
                                             <div className="flex-1 relative group">
                                                 <form onSubmit={handleAddComment}>
@@ -681,7 +681,7 @@ export default function TasksPage() {
                                                         type="submit"
                                                         size="icon"
                                                         disabled={!commentText.trim() || isCommenting}
-                                                        className="absolute right-1.5 top-1.5 h-9 w-9 bg-primary shadow-lg shadow-primary/20 rounded-xl hover:scale-105 transition-all text-primary-foreground disabled:opacity-0"
+                                                        className="absolute right-1.5 top-1.5 h-9 w-9 bg-primary rounded-xl hover:scale-105 transition-all text-primary-foreground disabled:opacity-0"
                                                     >
                                                         {isCommenting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
                                                     </Button>
@@ -695,13 +695,13 @@ export default function TasksPage() {
                                                 <div key={comment.id} className="flex items-start gap-4 group">
                                                     <Avatar className="h-10 w-10 border-2 border-background shadow-sm shrink-0">
                                                         <AvatarImage src={comment.user?.image} />
-                                                        <AvatarFallback className="text-[10px] font-black bg-muted">
+                                                        <AvatarFallback className="text-[10px] font-semibold bg-muted">
                                                             {comment.user?.name?.substring(0, 2).toUpperCase()}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="flex-1 space-y-1.5">
                                                         <div className="flex items-center gap-3">
-                                                            <span className="text-[11px] font-black tracking-tight">{comment.user?.name}</span>
+                                                            <span className="text-[11px] font-semibold tracking-tight">{comment.user?.name}</span>
                                                             <span className="text-[9px] font-bold text-muted-foreground opacity-40">{new Date(comment.createdAt).toLocaleString()}</span>
                                                         </div>
                                                         <div className="p-4 bg-muted/10 rounded-2xl rounded-tl-none text-sm font-medium leading-relaxed border border-border/10 group-hover:border-primary/10 transition-colors">
@@ -720,17 +720,17 @@ export default function TasksPage() {
                                 <div className="space-y-10">
                                     {/* Status Info */}
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Current Status</Label>
+                                        <Label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/60 ml-1 font-mono">Current Status</Label>
                                         <Select
                                             value={isModalEditing ? editingTask.status : selectedTask.status}
                                             onValueChange={(v) => isModalEditing ? setEditingTask({ ...editingTask, status: v }) : handleUpdateTask(selectedTask.id, { status: v })}
                                         >
-                                            <SelectTrigger className="h-12 bg-background border-none shadow-sm rounded-xl font-black uppercase text-[10px] tracking-widest ring-1 ring-border/40 hover:ring-primary/20 transition-all">
+                                            <SelectTrigger className="h-12 bg-background border-none shadow-sm rounded-xl font-semibold uppercase text-[10px] tracking-[0.12em] ring-1 ring-border/40 hover:ring-primary/20 transition-all font-mono">
                                                 <SelectValue />
                                             </SelectTrigger>
-                                            <SelectContent className="rounded-xl border-none shadow-2xl">
+                                            <SelectContent className="rounded-xl border">
                                                 {STATUS_COLUMNS.map(c => (
-                                                    <SelectItem key={c.id} value={c.id} className="text-[10px] font-black uppercase tracking-widest">{c.label}</SelectItem>
+                                                    <SelectItem key={c.id} value={c.id} className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em]">{c.label}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -738,17 +738,17 @@ export default function TasksPage() {
 
                                     {/* Priority Info */}
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Priority Level</Label>
+                                        <Label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/60 ml-1 font-mono">Priority Level</Label>
                                         <Select
                                             value={isModalEditing ? editingTask.priority : selectedTask.priority}
                                             onValueChange={(v) => isModalEditing ? setEditingTask({ ...editingTask, priority: v }) : handleUpdateTask(selectedTask.id, { priority: v })}
                                         >
-                                            <SelectTrigger className="h-12 bg-background border-none shadow-sm rounded-xl font-black uppercase text-[10px] tracking-widest ring-1 ring-border/40 hover:ring-primary/20 transition-all">
+                                            <SelectTrigger className="h-12 bg-background border-none shadow-sm rounded-xl font-semibold uppercase text-[10px] tracking-[0.12em] ring-1 ring-border/40 hover:ring-primary/20 transition-all font-mono">
                                                 <SelectValue />
                                             </SelectTrigger>
-                                            <SelectContent className="rounded-xl border-none shadow-2xl">
+                                            <SelectContent className="rounded-xl border">
                                                 {PRIORITIES.map(p => (
-                                                    <SelectItem key={p} value={p} className="text-[10px] font-black uppercase tracking-widest">{p}</SelectItem>
+                                                    <SelectItem key={p} value={p} className="text-[10px] font-semibold font-mono uppercase tracking-[0.12em]">{p}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
@@ -756,7 +756,7 @@ export default function TasksPage() {
 
                                     {/* Member Assignments */}
                                     <div className="space-y-4">
-                                        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Team Assignment</Label>
+                                        <Label className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted-foreground/60 ml-1 font-mono">Team Assignment</Label>
                                         <Select
                                             value={isModalEditing ? editingTask.assigneeId : selectedTask.assigneeId}
                                             onValueChange={(v) => isModalEditing ? setEditingTask({ ...editingTask, assigneeId: v }) : handleUpdateTask(selectedTask.id, { assigneeId: v })}
@@ -765,17 +765,17 @@ export default function TasksPage() {
                                                 <div className="flex items-center gap-3">
                                                     <Avatar className="h-8 w-8 rounded-xl ring-2 ring-background">
                                                         <AvatarImage src={(isModalEditing ? editingTask : selectedTask).assignee?.image} />
-                                                        <AvatarFallback className="text-[10px] font-black bg-primary/5 text-primary">
+                                                        <AvatarFallback className="text-[10px] font-semibold bg-primary/5 text-primary">
                                                             {((isModalEditing ? editingTask : selectedTask).assignee?.name || "?").substring(0, 2).toUpperCase()}
                                                         </AvatarFallback>
                                                     </Avatar>
                                                     <div className="text-left">
-                                                        <p className="text-[12px] font-black leading-none">{(isModalEditing ? editingTask : selectedTask).assignee?.name || "Unassigned"}</p>
-                                                        <p className="text-[9px] text-muted-foreground font-black uppercase tracking-tighter mt-1 opacity-50">Assignee</p>
+                                                        <p className="text-[12px] font-semibold leading-none">{(isModalEditing ? editingTask : selectedTask).assignee?.name || "Unassigned"}</p>
+                                                        <p className="text-[9px] text-muted-foreground font-semibold uppercase tracking-tight mt-1 opacity-50 font-mono">Assignee</p>
                                                     </div>
                                                 </div>
                                             </SelectTrigger>
-                                            <SelectContent className="rounded-xl border-none shadow-2xl p-2 max-h-[300px]">
+                                            <SelectContent className="rounded-xl border p-2 max-h-[300px]">
                                                 {employees.map(e => (
                                                     <SelectItem key={e.id} value={e.id} className="rounded-lg py-2">
                                                         <div className="flex items-center gap-3">
@@ -793,24 +793,24 @@ export default function TasksPage() {
                                     <div className="space-y-4 pt-10 border-t border-border/40">
                                         <div className="flex flex-col gap-4">
                                             <div className="flex flex-col">
-                                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-30">Reporter</span>
+                                                <span className="text-[9px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground opacity-30">Reporter</span>
                                                 <span className="text-[11px] font-bold mt-1 inline-flex items-center gap-2">
-                                                    <Avatar className="h-4 w-4"><AvatarImage src={selectedTask.reporter?.image} /><AvatarFallback className="text-[6px] font-black">{selectedTask.reporter?.name?.substring(0, 2)}</AvatarFallback></Avatar>
+                                                    <Avatar className="h-4 w-4"><AvatarImage src={selectedTask.reporter?.image} /><AvatarFallback className="text-[6px] font-semibold">{selectedTask.reporter?.name?.substring(0, 2)}</AvatarFallback></Avatar>
                                                     {selectedTask.reporter?.name || "System"}
                                                 </span>
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-30">Created on</span>
+                                                <span className="text-[9px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground opacity-30">Created on</span>
                                                 <span className="text-[11px] font-bold mt-1">{new Date(selectedTask.createdAt).toLocaleDateString(undefined, { dateStyle: 'long' })}</span>
                                             </div>
                                             <div className="flex flex-col">
-                                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-30">Last Update</span>
+                                                <span className="text-[9px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground opacity-30">Last Update</span>
                                                 <span className="text-[11px] font-bold mt-1 text-primary italic">{new Date(selectedTask.updatedAt).toLocaleTimeString()}</span>
                                             </div>
                                         </div>
 
                                         <div className="pt-6">
-                                            <button className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-primary transition-all group/attach">
+                                            <button className="flex items-center gap-3 text-[10px] font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground hover:text-primary transition-all group/attach">
                                                 <Paperclip className="h-3.5 w-3.5 group-hover/attach:rotate-12 transition-transform" />
                                                 <span>Attachments</span>
                                                 <Badge variant="secondary" className="ml-auto text-[8px] h-4 px-1.5 opacity-50">0</Badge>

@@ -1,107 +1,88 @@
-import { auth } from "@/auth";
+import { z } from "zod";
+import { startOfWeek, endOfWeek, differenceInMinutes, subDays } from "date-fns";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
-import { startOfWeek, endOfWeek, parseISO, differenceInMinutes } from "date-fns";
-import { Role } from "@prisma/client";
+import { HttpError, canActOnUser, parseBody, route, scopeByUser } from "@/lib/api";
+import { clockIn } from "@/services/attendance";
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const WEEKLY_TARGET_MINUTES = 2400;
+const WORKING_DAYS = 5;
 
+function parseDate(v: string | null): Date | null {
+    if (!v) return null;
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? null : d;
+}
+
+async function weeklyMetrics(userId: string, anchor: Date) {
+    const from = startOfWeek(anchor, { weekStartsOn: 1 });
+    const to = endOfWeek(anchor, { weekStartsOn: 1 });
+    const logs = await prisma.attendanceLog.findMany({ where: { userId, loginTime: { gte: from, lte: to } }, select: { loginTime: true, logoutTime: true } });
+    let totalMinutes = 0;
+    for (const log of logs) {
+        totalMinutes += differenceInMinutes(log.logoutTime ?? new Date(), log.loginTime);
+    }
+    const distinctDays = new Set(logs.map(l => l.loginTime.toDateString())).size;
+    return {
+        weeklyTotal: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+        targetPercentage: Math.min(Math.round((totalMinutes / WEEKLY_TARGET_MINUTES) * 100), 100),
+        attendanceScore: `${Math.min(Math.round((distinctDays / WORKING_DAYS) * 100), 100)}%`,
+        totalMinutes,
+    };
+}
+
+/**
+ * GET /api/attendance
+ *   ?startDate&endDate   own logs in range (or ?userId= for a report / anyone for HR/ADMIN)
+ *   ?team=true           every log the caller may see (self, reports, or all), default last 7 days
+ */
+export const GET = route(async ({ req, user }) => {
     const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-    const role = session.user.role as Role;
+    const start = parseDate(searchParams.get("startDate"));
+    const end = parseDate(searchParams.get("endDate"));
+    const range = start || end ? { loginTime: { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) } } : {};
 
-    try {
-        let where: any = {};
-
-        // Role-based filtering
-        if (role === Role.USER || role === Role.DEV) {
-            where.userId = session.user.id;
-        } else if (role === Role.PM) {
-            // Managers see their own and their subordinates logs
-            where = {
-                OR: [
-                    { userId: session.user.id },
-                    { user: { managerId: session.user.id } }
-                ]
-            };
-        }
-        // HR and ADMIN see everything
-
-        if (userId && (role === Role.ADMIN || role === Role.HR)) {
-            where.userId = userId;
-        }
-
+    if (searchParams.get("team") === "true") {
         const logs = await prisma.attendanceLog.findMany({
-            where,
-            include: {
-                user: { select: { name: true, image: true, role: true } }
-            },
+            where: { ...scopeByUser(user), ...(start || end ? range : { loginTime: { gte: subDays(new Date(), 7) } }) },
+            include: { user: { select: { name: true, image: true, role: true } } },
             orderBy: { loginTime: "desc" },
+            take: 500,
         });
-
-        // Calculate Weekly Total (Minutes) - only for personal view or if specific userId is requested
-        let metrics = null;
-        if (where.userId) {
-            let totalMinutes = 0;
-            logs.forEach(log => {
-                if (log.loginTime && log.logoutTime) {
-                    totalMinutes += differenceInMinutes(new Date(log.logoutTime), new Date(log.loginTime));
-                }
-            });
-
-            const weeklyTotalHours = Math.floor(totalMinutes / 60);
-            const weeklyTotalMinutes = totalMinutes % 60;
-            const weeklyTotalFormatted = `${weeklyTotalHours}h ${weeklyTotalMinutes}m`;
-
-            const weeklyTargetMinutes = 2400;
-            const targetPercentage = Math.min(Math.round((totalMinutes / weeklyTargetMinutes) * 100), 100);
-
-            const distinctDays = new Set(logs.map(l => new Date(l.loginTime).toDateString())).size;
-            const workingDays = 5;
-            const attendanceScore = Math.min(Math.round((distinctDays / workingDays) * 100), 100);
-
-            metrics = {
-                weeklyTotal: weeklyTotalFormatted,
-                targetPercentage,
-                attendanceScore: `${attendanceScore}%`,
-                totalMinutes
-            };
-        }
-
-        return NextResponse.json({ logs, metrics });
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to fetch attendance" }, { status: 500 });
+        return { logs, metrics: null };
     }
-}
 
-export async function POST(req: Request) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const requested = searchParams.get("userId");
+    const targetId = requested && requested !== user.id ? requested : user.id;
+    if (targetId !== user.id && !(await canActOnUser(user, targetId))) throw new HttpError(403, "You can only view your own attendance or your reports'.");
 
-    try {
-        const body = await req.json();
-        const log = await prisma.attendanceLog.create({
-            data: {
-                userId: session.user.id,
-                loginTime: body.loginTime ? new Date(body.loginTime) : new Date(),
-                logoutTime: body.logoutTime ? new Date(body.logoutTime) : null,
-                loginLocation: body.loginLocation || "Remote",
-                logoutLocation: body.logoutLocation || null,
-                latitude: body.latitude || null,
-                longitude: body.longitude || null,
-                accuracy: body.accuracy || null,
-                status: body.status || "LOGGED_IN",
-                isWfh: body.isWfh || false,
-            },
+    const logs = await prisma.attendanceLog.findMany({
+        where: { userId: targetId, ...range },
+        include: { user: { select: { name: true, image: true, role: true } } },
+        orderBy: { loginTime: "desc" },
+        take: 500,
+    });
+    // The page needs to know about an open session even when it started before the selected day.
+    if (!logs.some(l => !l.logoutTime)) {
+        const open = await prisma.attendanceLog.findFirst({
+            where: { userId: targetId, logoutTime: null },
+            include: { user: { select: { name: true, image: true, role: true } } },
         });
-        return NextResponse.json(log, { status: 201 });
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to create attendance log" }, { status: 500 });
+        if (open) logs.unshift(open);
     }
-}
+    return { logs, metrics: await weeklyMetrics(targetId, start ?? new Date()) };
+});
+
+const clockInSchema = z.object({
+    isWfh: z.boolean().optional(),
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
+    accuracy: z.number().nullable().optional(),
+}).passthrough();
+
+/** Clock in. Time is set by the server; office clock-ins are checked against the geofence. */
+export const POST = route(async ({ req, user }) => {
+    const body = await parseBody(req, clockInSchema);
+    return Response.json(await clockIn(user, body), { status: 201 });
+});

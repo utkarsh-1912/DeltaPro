@@ -1,114 +1,39 @@
-import { auth } from "@/auth";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
-import { Role } from "@prisma/client";
+import { HttpError, canActOnUser, isManager, parseBody, route, scopeByUser } from "@/lib/api";
+import { REGULARIZATION_TYPES, createRegularization, decideRegularization } from "@/services/attendance";
 
-export async function GET(req: Request) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const dynamic = 'force-dynamic';
 
-    const { searchParams } = new URL(req.url);
-    const userId = searchParams.get("userId");
-    const role = session.user.role;
+export const GET = route(async ({ req, user }) => {
+    const userId = new URL(req.url).searchParams.get("userId");
+    if (userId && !(await canActOnUser(user, userId))) throw new HttpError(403, "Forbidden");
+    return prisma.attendanceRequest.findMany({
+        where: userId ? { userId } : scopeByUser(user),
+        include: {
+            user: { select: { name: true, image: true, role: true } },
+            approver: { select: { name: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 500,
+    });
+});
 
-    try {
-        let where: any = {};
+const createSchema = z.object({
+    type: z.enum(REGULARIZATION_TYPES),
+    date: z.string(),
+    reason: z.string().trim().min(3, "Give a reason for the correction.").max(1000),
+});
 
-        // If regular user, only see their own requests
-        if (role === Role.USER || role === Role.DEV) {
-            where.userId = session.user.id;
-        } else if (role === Role.PM) {
-            // Managers see their own and their subordinates' requests
-            where = {
-                OR: [
-                    { userId: session.user.id },
-                    { user: { managerId: session.user.id } }
-                ]
-            };
-        }
-        // HR and ADMIN see everything by default, unless userId is specified
+export const POST = route(async ({ req, user }) => {
+    const body = await parseBody(req, createSchema);
+    return Response.json(await createRegularization(user, body), { status: 201 });
+});
 
-        if (userId) {
-            where.userId = userId;
-        }
+const decideSchema = z.object({ id: z.string(), status: z.enum(["APPROVED", "REJECTED"]) });
 
-        const requests = await prisma.attendanceRequest.findMany({
-            where,
-            include: {
-                user: { select: { name: true, image: true, role: true } },
-                approver: { select: { name: true } }
-            },
-            orderBy: { createdAt: "desc" }
-        });
-
-        return NextResponse.json(requests);
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to fetch attendance requests" }, { status: 500 });
-    }
-}
-
-export async function POST(req: Request) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    try {
-        const body = await req.json();
-        const request = await prisma.attendanceRequest.create({
-            data: {
-                userId: session.user.id,
-                type: body.type, // CLOCK_IN, CLOCK_OUT, FULL_DAY
-                date: new Date(body.date),
-                reason: body.reason,
-            },
-        });
-        return NextResponse.json(request, { status: 201 });
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to create attendance request" }, { status: 500 });
-    }
-}
-
-export async function PATCH(req: Request) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-
-    const role = session.user.role;
-    if (role === Role.USER || role === Role.DEV) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
-
-    try {
-        const body = await req.json();
-        const { id, status } = body;
-
-        const updatedRequest = await prisma.attendanceRequest.update({
-            where: { id },
-            data: {
-                status,
-                approverId: session.user.id
-            }
-        });
-
-        // If approved, create the attendance log automatically
-        if (status === "APPROVED") {
-            const reqData = await prisma.attendanceRequest.findUnique({ where: { id } });
-            if (reqData) {
-                await prisma.attendanceLog.create({
-                    data: {
-                        userId: reqData.userId,
-                        loginTime: reqData.date, // Simplification: set loginTime to the requested date
-                        logoutTime: reqData.type === "FULL_DAY" ? new Date(new Date(reqData.date).setHours(new Date(reqData.date).getHours() + 9)) : null,
-                        loginLocation: "Regularization",
-                        status: "LOGGED_OUT"
-                    }
-                });
-            }
-        }
-
-        return NextResponse.json(updatedRequest);
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to update attendance request" }, { status: 500 });
-    }
-}
+export const PATCH = route(async ({ req, user }) => {
+    if (!isManager(user)) throw new HttpError(403, "Forbidden");
+    const { id, status } = await parseBody(req, decideSchema);
+    return decideRegularization(user, id, status);
+});

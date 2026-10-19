@@ -1,57 +1,29 @@
-import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { z } from "zod";
 import { Role } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { audit } from "@/lib/activity";
+import { parseBody, route } from "@/lib/api";
+import { getAttendanceSettings } from "@/services/attendance";
 
-export async function GET() {
-    try {
-        let settings = await prisma.attendanceSettings.findFirst();
-        if (!settings) {
-            settings = await prisma.attendanceSettings.create({
-                data: {
-                    geofencingEnabled: true,
-                    officeLat: 19.0760,
-                    officeLng: 72.8777,
-                    allowedRadius: 500,
-                    wfhAllowed: true
-                }
-            });
-        }
-        return NextResponse.json(settings);
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to fetch attendance settings" }, { status: 500 });
-    }
-}
+export const dynamic = 'force-dynamic';
 
-export async function PATCH(req: Request) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const GET = route(async () => getAttendanceSettings());
 
-    const role = session.user.role;
-    if (role !== Role.ADMIN && role !== Role.HR) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+const schema = z.object({
+    geofencingEnabled: z.boolean().optional(),
+    officeLat: z.number().min(-90).max(90).optional(),
+    officeLng: z.number().min(-180).max(180).optional(),
+    allowedRadius: z.number().int().min(10).max(50000).optional(),
+    wfhAllowed: z.boolean().optional(),
+    maxAccuracyMeters: z.number().int().min(5).max(5000).optional(),
+    autoLogoutHours: z.number().int().min(1).max(24).optional(),
+    autoLogoutOutOfRange: z.boolean().optional(),
+}).strip();
 
-    try {
-        const body = await req.json();
-        const settings = await prisma.attendanceSettings.findFirst();
-
-        let updated;
-        if (settings) {
-            updated = await prisma.attendanceSettings.update({
-                where: { id: settings.id },
-                data: body
-            });
-        } else {
-            updated = await prisma.attendanceSettings.create({
-                data: body
-            });
-        }
-
-        return NextResponse.json(updated);
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to update attendance settings" }, { status: 500 });
-    }
-}
+export const PATCH = route(async ({ req, user }) => {
+    const data = await parseBody(req, schema);
+    const current = await getAttendanceSettings();
+    const updated = await prisma.attendanceSettings.update({ where: { id: current.id }, data });
+    await audit(prisma, user.id, "attendance.settings_updated", "AttendanceSettings", updated.id, data);
+    return updated;
+}, { roles: [Role.ADMIN, Role.HR] });

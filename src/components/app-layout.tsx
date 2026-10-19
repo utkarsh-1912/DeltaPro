@@ -30,7 +30,13 @@ import {
   AlertCircle,
   CheckCircle2,
   Menu,
-  X
+  X,
+  Plug,
+  ArrowUpRight,
+  CalendarRange,
+  PanelLeftClose,
+  PanelLeftOpen,
+  SlidersHorizontal
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
@@ -45,15 +51,16 @@ import {
 import { useSession, signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { LiveClock, SmoothScroll } from "@/components/motion";
 import { Command as CommandPrimitive, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "cmdk";
 
-const SIDEBAR_WIDTH = 260;
-const COLLAPSED_WIDTH = 80;
+const SIDEBAR_WIDTH = 256;
+const COLLAPSED_WIDTH = 72;
 
 const Logo = ({ className }: { className?: string }) => (
-  <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
-    <path d="M14 4L4 24H24L14 4Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    <path d="M4 24L14 14L24 24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  <svg width="22" height="22" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+    <path d="M14 3L3 25H25L14 3Z" stroke="currentColor" strokeWidth="2.4" strokeLinejoin="round" />
+    <path d="M14 13L8.5 24H19.5L14 13Z" fill="currentColor" />
   </svg>
 );
 
@@ -123,10 +130,10 @@ function GlobalSearch() {
         <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
         <Button
           variant="outline"
-          className="h-9 w-64 justify-start bg-muted/50 border-none pl-9 pr-4 text-sm font-normal text-muted-foreground hover:bg-muted/80 rounded-full"
+          className="h-9 w-56 lg:w-72 justify-start bg-card border pl-9 pr-2 text-sm font-normal text-muted-foreground hover:bg-secondary rounded-full"
           onClick={() => setOpen(true)}
         >
-          Search enterprise...
+          Search anything
           <kbd className="ml-auto pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100 uppercase">
             <span className="text-xs">⌘</span>K
           </kbd>
@@ -134,7 +141,7 @@ function GlobalSearch() {
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-3xl rounded-2xl bg-background/95 backdrop-blur-xl mt-[10vh]">
+        <DialogContent className="max-w-2xl p-0 overflow-hidden border-none shadow-xl rounded-2xl bg-background/95 backdrop-blur-xl mt-[10vh]">
           <DialogTitle className="sr-only">Enterprise Search</DialogTitle>
           <DialogDescription className="sr-only">Search across all modules including tasks, projects, employees and workspaces.</DialogDescription>
           <CommandPrimitive className="flex h-full w-full flex-col overflow-hidden rounded-2xl">
@@ -146,7 +153,7 @@ function GlobalSearch() {
                 value={query}
                 onValueChange={setQuery}
               />
-              <div className="px-2 py-0.5 rounded-lg bg-muted text-[10px] font-black tracking-widest uppercase opacity-40 select-none">Esc</div>
+              <div className="px-2 py-0.5 rounded-lg bg-muted text-[10px] font-medium font-mono tracking-wider uppercase opacity-40 select-none">Esc</div>
             </div>
 
             <CommandList className="max-h-[450px] overflow-y-auto overflow-x-hidden p-2 scrollbar-hide">
@@ -155,7 +162,7 @@ function GlobalSearch() {
                   <div className="h-16 w-16 bg-muted/20 rounded-full flex items-center justify-center">
                     <SearchIcon className="h-8 w-8 opacity-20" />
                   </div>
-                  <p className="text-sm font-black uppercase tracking-widest text-muted-foreground opacity-40">No records found</p>
+                  <p className="text-sm font-medium font-mono uppercase tracking-wider text-muted-foreground opacity-40">No records found</p>
                 </div>
               </CommandEmpty>
 
@@ -163,7 +170,7 @@ function GlobalSearch() {
                 <CommandGroup
                   key={category}
                   heading={category}
-                  className="px-3 pt-6 pb-2 text-[10px] font-black uppercase tracking-[0.2em] text-primary/40 first:pt-2"
+                  className="px-3 pt-6 pb-2 text-[10px] font-medium font-mono uppercase tracking-wider text-primary/40 first:pt-2"
                 >
                   <div className="space-y-1 mt-1">
                     {items.map((item: any, i: number) => {
@@ -196,11 +203,11 @@ function GlobalSearch() {
                   <div className="px-4 py-2 inline-flex gap-4 bg-muted/20 rounded-2xl border border-dashed">
                     <div className="flex items-center gap-2">
                       <kbd className="px-1.5 py-0.5 rounded bg-muted-foreground/10 text-[9px] font-bold">↑↓</kbd>
-                      <span className="text-[9px] font-black uppercase tracking-tighter opacity-40">Navigate</span>
+                      <span className="text-[9px] font-medium font-mono uppercase tracking-wider opacity-40">Navigate</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <kbd className="px-1.5 py-0.5 rounded bg-muted-foreground/10 text-[9px] font-bold">Enter</kbd>
-                      <span className="text-[9px] font-black uppercase tracking-tighter opacity-40">Open</span>
+                      <span className="text-[9px] font-medium font-mono uppercase tracking-wider opacity-40">Open</span>
                     </div>
                   </div>
                 </div>
@@ -280,7 +287,7 @@ function NotificationCenter() {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[380px] p-0 rounded-2xl shadow-2xl border-border/40 overflow-hidden bg-background/80 backdrop-blur-xl z-50">
+      <PopoverContent align="end" className="w-[380px] p-0 rounded-xl shadow-xl border-border/40 overflow-hidden bg-background/80 backdrop-blur-xl z-50">
         <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h3 className="font-bold">Notifications</h3>
@@ -337,23 +344,18 @@ function Breadcrumbs() {
   const pathname = usePathname();
   const paths = pathname.split('/').filter(Boolean);
 
-  if (paths.length === 0) return <span className="text-sm font-medium text-muted-foreground">Home</span>;
-
   return (
-    <div className="flex items-center gap-2 text-sm z-10 relative">
-      <Link href="/dashboard" className="text-muted-foreground hover:text-primary transition-colors font-medium">DeltaPro</Link>
+    <nav aria-label="Breadcrumb" className="flex items-center gap-2 font-mono text-[11px] uppercase tracking-[0.14em]">
+      <Link href="/dashboard" className="text-muted-foreground transition-colors hover:text-foreground">DeltaPro</Link>
       {paths.map((path, i) => (
         <React.Fragment key={path}>
-          <ChevronRight className="h-4 w-4 text-muted-foreground/50 shrink-0" />
-          <span className={cn(
-            "capitalize shrink-0",
-            i === paths.length - 1 ? "font-bold text-foreground" : "text-muted-foreground font-medium"
-          )}>
+          <span className="text-muted-foreground/40">/</span>
+          <span className={cn("shrink-0", i === paths.length - 1 ? "text-foreground" : "text-muted-foreground")}>
             {path.replace(/-/g, ' ')}
           </span>
         </React.Fragment>
       ))}
-    </div>
+    </nav>
   );
 }
 
@@ -370,7 +372,7 @@ function UserProfileWidget({ isCollapsed }: { isCollapsed?: boolean }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-12 w-full justify-start gap-3 px-2 hover:bg-muted/50 transition-all rounded-xl border border-transparent hover:border-border/40 shrink-0 overflow-hidden">
+        <Button variant="ghost" className={cn("relative h-12 w-full justify-start gap-3 px-2 hover:bg-secondary transition-all rounded-full shrink-0 overflow-hidden", isCollapsed && "justify-center px-0")}>
           <Avatar className="h-8 w-8 border-2 border-background shadow-sm shrink-0">
             <AvatarImage src={user?.image || undefined} alt={user?.name || "User"} />
             <AvatarFallback className="bg-primary/10 text-primary font-bold">{getInitials(user?.name)}</AvatarFallback>
@@ -378,14 +380,14 @@ function UserProfileWidget({ isCollapsed }: { isCollapsed?: boolean }) {
           {!isCollapsed && (
             <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col items-start truncate overflow-hidden">
               <p className="text-sm font-bold truncate leading-none mb-1">{user?.name}</p>
-              <p className="text-[10px] text-muted-foreground truncate uppercase font-bold tracking-tight inline-flex items-center">
+              <p className="font-mono text-[10px] text-muted-foreground truncate uppercase tracking-[0.12em] inline-flex items-center">
                 {user?.role || "Team Member"}
               </p>
             </motion.div>
           )}
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="top" className="w-64 p-2 rounded-2xl shadow-2xl border-border/40 backdrop-blur-xl z-50 mb-2">
+      <DropdownMenuContent align="end" side="top" className="w-64 p-2 rounded-xl shadow-xl border-border/40 backdrop-blur-xl z-50 mb-2">
         <DropdownMenuLabel className="font-normal px-3 py-4">
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12 border-2 border-primary/20 shadow-md transform transition-transform hover:scale-105">
@@ -403,10 +405,12 @@ function UserProfileWidget({ isCollapsed }: { isCollapsed?: boolean }) {
           <UserIcon className="mr-3 h-4 w-4 text-muted-foreground" />
           My Profile
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push('/admin')} className="py-2.5 rounded-lg focus:bg-primary/5 cursor-pointer text-blue-500 font-medium">
-          <Settings className="mr-3 h-4 w-4" />
-          Admin Panel
-        </DropdownMenuItem>
+        {["ADMIN", "HR", "PM"].includes(user?.role ?? "") && (
+          <DropdownMenuItem onClick={() => router.push('/admin')} className="py-2.5 rounded-lg cursor-pointer">
+            <SlidersHorizontal className="mr-3 h-4 w-4 text-muted-foreground" />
+            Admin console
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator className="bg-muted/50" />
         <DropdownMenuItem onClick={handleLogout} className="py-2.5 rounded-lg focus:bg-rose-50 hover:text-rose-600 focus:text-rose-600 cursor-pointer text-rose-500 font-bold transition-colors">
           <LogOut className="mr-3 h-4 w-4" />
@@ -417,197 +421,289 @@ function UserProfileWidget({ isCollapsed }: { isCollapsed?: boolean }) {
   );
 }
 
-function NavSection({ title, children, isCollapsed }: { title: string; children: React.ReactNode; isCollapsed: boolean }) {
-  return (
-    <div className="space-y-1 mb-6 px-3 relative">
-      {!isCollapsed && (
-        <motion.h4 initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="px-3 mb-2 text-[10px] font-extrabold text-muted-foreground/60 uppercase tracking-[0.2em] truncate">
-          {title}
-        </motion.h4>
-      )}
-      <ul className="space-y-1">
-        {children}
-      </ul>
-    </div>
-  );
-}
+type NavEntry = { href: string; icon: any; label: string; roles?: string[]; exact?: boolean };
+type NavGroup = { title: string; items: NavEntry[] };
 
-function NavItem({
-  href,
-  icon: Icon,
-  label,
-  isActive,
-  isCollapsed
-}: {
-  href: string;
-  icon: any;
-  label: string;
-  isActive: boolean;
-  isCollapsed: boolean;
-}) {
+const MANAGERS = ["ADMIN", "HR", "PM"];
+
+const NAV: NavGroup[] = [
+  { title: "Overview", items: [{ href: "/dashboard", icon: LayoutDashboard, label: "Dashboard", exact: true }] },
+  {
+    title: "People",
+    items: [
+      { href: "/employees", icon: Users, label: "Directory" },
+      { href: "/attendance", icon: Clock, label: "Attendance" },
+      { href: "/leave", icon: CalendarOff, label: "Leave" },
+    ],
+  },
+  {
+    title: "Scheduling",
+    items: [
+      { href: "/rota", icon: GanttChartSquare, label: "Shift rota" },
+      { href: "/weekend", icon: CalendarRange, label: "Weekend cover" },
+      { href: "/matrix", icon: ListTree, label: "Rota matrix" },
+    ],
+  },
+  {
+    title: "Work",
+    items: [
+      { href: "/projects", icon: Briefcase, label: "Projects" },
+      { href: "/tasks", icon: CheckSquare, label: "Tasks" },
+      { href: "/docs", icon: FileText, label: "Knowledge" },
+    ],
+  },
+  {
+    title: "Administration",
+    items: [
+      { href: "/admin", icon: SlidersHorizontal, label: "Admin console", roles: MANAGERS },
+      { href: "/integrations", icon: Plug, label: "Integrations", roles: ["ADMIN", "HR"] },
+      { href: "/settings", icon: Settings, label: "Settings" },
+    ],
+  },
+];
+
+const PUBLIC_PAGES = ["/", "/about", "/contact", "/privacy", "/terms", "/login", "/signup", "/forgot-password", "/reset-password"];
+
+function NavItem({ item, isActive, isCollapsed }: { item: NavEntry; isActive: boolean; isCollapsed: boolean }) {
+  const Icon = item.icon;
   return (
     <li>
       <Link
-        href={href}
+        href={item.href}
+        aria-current={isActive ? "page" : undefined}
         className={cn(
-          "flex items-center relative h-10 px-3 transition-colors font-medium rounded-xl group select-none whitespace-nowrap overflow-hidden",
-          isActive
-            ? "bg-primary text-primary-foreground shadow-md shadow-primary/20 hover:bg-primary/95"
-            : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
+          "group relative flex h-9 items-center rounded-full px-3 text-[13.5px] font-medium transition-colors select-none whitespace-nowrap",
+          isActive ? "text-primary-foreground" : "text-muted-foreground hover:text-foreground",
+          isCollapsed && "justify-center px-0"
         )}
-        title={isCollapsed ? label : undefined}
+        title={isCollapsed ? item.label : undefined}
       >
-        <Icon className={cn("h-5 w-5 shrink-0", isActive ? "stroke-[2.5px]" : "stroke-2")} />
-        {!isCollapsed && (
-          <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="ml-3 truncate">{label}</motion.span>
+        {isActive && (
+          <motion.span layoutId="nav-pill" transition={{ type: "spring", stiffness: 420, damping: 36 }} className="absolute inset-0 rounded-full bg-primary" />
         )}
-        {isActive && !isCollapsed && (
-          <motion.div
-            layoutId="sidebar-active-indicator"
-            className="absolute right-2 h-1.5 w-1.5 rounded-full bg-primary-foreground shadow-sm"
-          />
-        )}
+        {!isActive && <span className="absolute inset-0 rounded-full transition-colors group-hover:bg-secondary" />}
+        <Icon className="relative h-[17px] w-[17px] shrink-0" />
+        {!isCollapsed && <span className="relative ml-3 truncate">{item.label}</span>}
       </Link>
     </li>
   );
 }
 
+/** Thin bar that runs across the top while a route is changing. */
+function RouteProgress() {
+  const pathname = usePathname();
+  const [key, setKey] = React.useState(0);
+  React.useEffect(() => setKey((k) => k + 1), [pathname]);
+  return (
+    <motion.div
+      key={key}
+      className="pointer-events-none fixed inset-x-0 top-0 z-[70] h-[2px] origin-left bg-signal"
+      initial={{ scaleX: 0, opacity: 1 }}
+      animate={{ scaleX: 1, opacity: 0 }}
+      transition={{ scaleX: { duration: 0.6, ease: [0.22, 1, 0.36, 1] }, opacity: { delay: 0.55, duration: 0.3 } }}
+    />
+  );
+}
+
+function ThemeToggle() {
+  const { setTheme, resolvedTheme } = useTheme();
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Toggle dark mode"
+      className="relative h-9 w-9 rounded-full text-muted-foreground hover:bg-secondary"
+      onClick={() => setTheme(resolvedTheme === "dark" ? "light" : "dark")}
+    >
+      <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+      <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+    </Button>
+  );
+}
+
+function PublicShell({ children, pathname }: { children: React.ReactNode; pathname: string }) {
+  const [scrolled, setScrolled] = React.useState(false);
+  React.useEffect(() => {
+    const on = () => setScrolled(window.scrollY > 40);
+    on();
+    window.addEventListener("scroll", on, { passive: true });
+    return () => window.removeEventListener("scroll", on);
+  }, []);
+
+  const authPage = ["/login", "/signup", "/forgot-password", "/reset-password"].includes(pathname);
+  if (authPage) return <main className="min-h-screen bg-background text-foreground">{children}</main>;
+
+  return (
+    <SmoothScroll>
+      <div className="min-h-screen bg-background text-foreground flex flex-col">
+        <header className="fixed inset-x-0 top-0 z-50">
+          {/* Utility bar (Reminous) */}
+          <div className={cn("border-b bg-background/80 backdrop-blur-xl transition-all duration-500", scrolled ? "h-0 overflow-hidden border-transparent opacity-0" : "h-9 opacity-100")}>
+            <div className="container mx-auto flex h-9 items-center justify-between px-5 sm:px-8">
+              <p className="flex items-center gap-2 font-mono text-[11px] text-muted-foreground">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" /> Onboarding new organisations this quarter
+              </p>
+              <div className="hidden items-center gap-6 font-mono text-[11px] text-muted-foreground sm:flex">
+                <Link href="/about" className="hover:text-foreground">Company</Link>
+                <Link href="/#integrations" className="hover:text-foreground">Integrations</Link>
+                <Link href="/contact" className="hover:text-foreground">Contact</Link>
+              </div>
+            </div>
+          </div>
+          <div className={cn("transition-all duration-500", scrolled ? "pt-3" : "pt-0")}>
+            <div
+              className={cn(
+                "container mx-auto flex h-16 items-center justify-between px-5 transition-all duration-500 sm:px-8",
+                scrolled ? "h-14 max-w-5xl rounded-full border bg-background/80 px-3 shadow-[0_10px_40px_-12px_hsl(var(--primary)/0.25)] backdrop-blur-xl sm:px-3" : "bg-background/0"
+              )}
+            >
+              <Link href="/" className="flex items-center gap-2.5 pl-1 group">
+                <span className="flex h-8 w-8 items-center justify-center rounded-[10px] bg-primary text-primary-foreground transition-transform duration-500 group-hover:rotate-[120deg]">
+                  <Logo />
+                </span>
+                <span className="font-display text-lg font-bold tracking-tight">DeltaPro</span>
+              </Link>
+              <nav className="hidden items-center gap-1 md:flex" aria-label="Main">
+                {[["Platform", "/#platform"], ["Workflows", "/#workflows"], ["Integrations", "/#integrations"], ["Company", "/about"]].map(([l, h]) => (
+                  <Link key={l} href={h} className="rounded-full px-4 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">{l}</Link>
+                ))}
+              </nav>
+              <div className="flex items-center gap-1.5">
+                <ThemeToggle />
+                <Button asChild variant="ghost" size="sm" className="hidden rounded-full sm:inline-flex">
+                  <Link href="/login">Sign in</Link>
+                </Button>
+                <Button asChild size="sm" className="h-10 rounded-full px-5">
+                  <Link href="/signup">Get in touch <ArrowUpRight className="ml-1 h-3.5 w-3.5" /></Link>
+                </Button>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className={cn("relative flex-1", pathname !== "/" && "pt-32")}>{children}</main>
+        <footer className="bg-night relative overflow-hidden">
+          <div className="container mx-auto px-5 pt-20 sm:px-8">
+            <div className="grid gap-10 border-b border-white/10 pb-14 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
+              <div>
+                <p className="font-display text-2xl font-bold">Run your people, not your spreadsheets.</p>
+                <p className="mt-3 max-w-sm text-sm text-white/55">Attendance, leave, rotas, projects and people, with the integrations HR already depends on.</p>
+              </div>
+              {[
+                ["Platform", [["Attendance", "/#platform"], ["Leave", "/#platform"], ["Rotas", "/#platform"], ["Integrations", "/#integrations"]]],
+                ["Company", [["About", "/about"], ["Contact", "/contact"], ["Sign in", "/login"]]],
+                ["Legal", [["Privacy", "/privacy"], ["Terms", "/terms"]]],
+              ].map(([title, links]) => (
+                <div key={title as string}>
+                  <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-white/40">{title as string}</p>
+                  <ul className="mt-4 space-y-2 text-sm">
+                    {(links as string[][]).map(([l, h]) => (
+                      <li key={l}><Link href={h} className="text-white/70 transition-colors hover:text-white">{l}</Link></li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-4 py-6 font-mono text-[11px] uppercase tracking-[0.14em] text-white/45">
+              <span>&copy; {new Date().getFullYear()} DeltaLabs by Utkristi.io</span>
+              <LiveClock label="Mumbai" timeZone="Asia/Kolkata" />
+            </div>
+          </div>
+          <p aria-hidden className="wordmark select-none whitespace-nowrap px-3 pb-2 text-center text-[clamp(5rem,24vw,24rem)] text-white/[0.07]">DeltaPro</p>
+        </footer>
+      </div>
+    </SmoothScroll>
+  );
+}
+
 export function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { status } = useSession();
-  const { setTheme, theme } = useTheme();
+  const { status, data: session } = useSession();
+  const role = session?.user?.role ?? "USER";
 
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(true);
   const [isMobileOpen, setIsMobileOpen] = React.useState(false);
 
-  // Close mobile sidebar on route change
   React.useEffect(() => {
-    setIsMobileOpen(false);
-  }, [pathname]);
+    try {
+      const saved = localStorage.getItem("deltapro.sidebar");
+      if (saved) setIsSidebarOpen(saved === "open");
+    } catch { }
+  }, []);
+  const toggleSidebar = () => {
+    setIsSidebarOpen((v) => {
+      try { localStorage.setItem("deltapro.sidebar", v ? "closed" : "open"); } catch { }
+      return !v;
+    });
+  };
 
-  const isPublicPage = ["/", "/about", "/contact", "/privacy", "/terms", "/login", "/signup"].includes(pathname);
+  React.useEffect(() => setIsMobileOpen(false), [pathname]);
 
-  if (status === "unauthenticated" || isPublicPage) {
-    return (
-      <div className="min-h-screen bg-background text-foreground selection:bg-primary selection:text-primary-foreground flex flex-col">
-        <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-xl border-border/40 shrink-0">
-          <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between">
-            <Link href="/" className="flex items-center gap-2.5 group">
-              <div className="h-9 w-9 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-lg shadow-primary/20 group-hover:scale-110 transition-transform">
-                <Logo />
-              </div>
-              <span className="font-extrabold text-xl tracking-tight">DeltaPro</span>
-            </Link>
-
-            {/* Mobile Actions */}
-            <div className="flex md:hidden items-center gap-2">
-              <Button asChild variant="ghost" size="sm" className="font-bold px-2 h-8">
-                <Link href="/login">Sign In</Link>
-              </Button>
-              <Button asChild size="sm" className="rounded-full px-4 h-8 font-bold shadow-lg shadow-primary/20">
-                <Link href="/signup">Join</Link>
-              </Button>
-            </div>
-
-            <nav className="hidden md:flex items-center gap-8">
-              <Button asChild variant="ghost" size="sm" className="font-bold">
-                <Link href="/login">Sign In</Link>
-              </Button>
-              <Button asChild size="sm" className="rounded-full px-6 font-bold shadow-xl shadow-primary/20 hover:-translate-y-0.5 transition-transform">
-                <Link href="/signup">Get Started</Link>
-              </Button>
-            </nav>
-          </div>
-        </header>
-        <main className="relative flex-1">{children}</main>
-        {pathname !== "/login" && pathname !== "/signup" && (
-          <footer className="py-12 border-t bg-muted/20 shrink-0">
-            <div className="container mx-auto px-4 text-center">
-              <div className="flex flex-col md:flex-row items-center justify-between gap-6 px-4">
-                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
-                  &copy; {new Date().getFullYear()} DeltaLabs by Utkristi.io
-                </p>
-                <div className="flex gap-6 text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  <Link href="/about" className="hover:text-primary transition-colors">About</Link>
-                  <Link href="/contact" className="hover:text-primary transition-colors">Contact</Link>
-                  <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
-                  <Link href="/terms" className="hover:text-primary transition-colors">Terms</Link>
-                </div>
-              </div>
-            </div>
-          </footer>
-        )}
-      </div>
-    );
+  if (status === "unauthenticated" || PUBLIC_PAGES.includes(pathname)) {
+    return <PublicShell pathname={pathname}>{children}</PublicShell>;
   }
 
-  // --- PRIVATE EXACT LAYOUT ARCHITECTURE ---
-  // Using native CSS Flexbox & CSS Custom Properties for perfect adherence and 0 overlap
-  const currentSidebarWidth = isSidebarOpen ? SIDEBAR_WIDTH : COLLAPSED_WIDTH;
+  const collapsed = !isSidebarOpen && !isMobileOpen;
+  const groups = NAV.map((g) => ({ ...g, items: g.items.filter((i) => !i.roles || i.roles.includes(role)) })).filter((g) => g.items.length);
+  const isActive = (item: NavEntry) => (item.exact ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/"));
+  const currentWidth = isSidebarOpen ? SIDEBAR_WIDTH : COLLAPSED_WIDTH;
 
   const sidebarContent = (
-    <div className="flex flex-col h-full bg-background relative overflow-hidden">
-      {/* Sidebar Header */}
-      <div className="h-16 shrink-0 flex items-center px-4 border-b border-border/40">
-        <div className="flex items-center gap-3 overflow-hidden ml-1">
-          <div className="h-9 w-9 shrink-0 bg-primary text-primary-foreground rounded-xl flex items-center justify-center shadow-lg shadow-primary/20">
+    <div className="relative flex h-full flex-col bg-sidebar">
+      <div className={cn("flex h-16 shrink-0 items-center gap-3 border-b px-4", collapsed && "justify-center px-0")}>
+        <Link href="/dashboard" className="flex items-center gap-3 overflow-hidden">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[11px] bg-primary text-primary-foreground">
             <Logo />
-          </div>
-          {!isSidebarOpen && !isMobileOpen ? null : (
-            <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="flex flex-col">
-              <span className="text-lg font-black tracking-tight leading-none uppercase text-foreground">DeltaPro</span>
-              <span className="text-[9px] font-bold text-primary tracking-widest uppercase">Enterprise</span>
-            </motion.div>
+          </span>
+          {!collapsed && (
+            <span className="flex flex-col leading-none">
+              <span className="font-display text-[17px] font-bold tracking-tight">DeltaPro</span>
+              <span className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.16em] text-muted-foreground">People operations</span>
+            </span>
           )}
-        </div>
+        </Link>
       </div>
 
-      {/* Sidebar Scrollable Nav */}
-      <ScrollArea className="flex-1 overflow-y-auto overflow-x-hidden pt-6 pb-4">
-        <NavSection title="Overview" isCollapsed={!isSidebarOpen && !isMobileOpen}>
-          <NavItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" isActive={pathname === "/dashboard"} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-        </NavSection>
-
-        <NavSection title="HRM & Workforce" isCollapsed={!isSidebarOpen && !isMobileOpen}>
-          <NavItem href="/attendance" icon={Clock} label="Attendance" isActive={pathname.startsWith("/attendance")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-          <NavItem href="/leave" icon={CalendarOff} label="Leave Matrix" isActive={pathname.startsWith("/leave")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-          <NavItem href="/employees" icon={Users} label="Employee Directory" isActive={pathname.startsWith("/employees")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-        </NavSection>
-
-        <NavSection title="Project & Tasks" isCollapsed={!isSidebarOpen && !isMobileOpen}>
-          <NavItem href="/projects" icon={Briefcase} label="Projects" isActive={pathname.startsWith("/projects")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-          <NavItem href="/tasks" icon={CheckSquare} label="My Tasks" isActive={pathname.startsWith("/tasks")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-        </NavSection>
-
-        <NavSection title="Knowledge & Docs" isCollapsed={!isSidebarOpen && !isMobileOpen}>
-          <NavItem href="/docs" icon={FileText} label="Workspaces" isActive={pathname.startsWith("/docs")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-        </NavSection>
-
-        <NavSection title="Operations" isCollapsed={!isSidebarOpen && !isMobileOpen}>
-          <NavItem href="/rota" icon={GanttChartSquare} label="Shift Rota" isActive={pathname.startsWith("/rota")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-          <NavItem href="/matrix" icon={ListTree} label="Rota Matrix" isActive={pathname.startsWith("/matrix")} isCollapsed={!isSidebarOpen && !isMobileOpen} />
-        </NavSection>
+      <ScrollArea className="flex-1 overflow-y-auto overflow-x-hidden">
+        <nav className={cn("space-y-6 px-3 py-5", collapsed && "px-2")} aria-label="Application">
+          {groups.map((g) => (
+            <div key={g.title}>
+              {collapsed ? <div className="mx-auto mb-2 h-px w-6 bg-border" /> : <p className="eyebrow mb-2 px-3 text-[10px]">{g.title}</p>}
+              <ul className="space-y-0.5">
+                {g.items.map((item) => (
+                  <NavItem key={item.href} item={item} isActive={isActive(item)} isCollapsed={collapsed} />
+                ))}
+              </ul>
+            </div>
+          ))}
+        </nav>
       </ScrollArea>
 
-      {/* Sidebar Footer Menu */}
-      <div className="shrink-0 p-3 border-t border-border/40 bg-muted/10">
-        <UserProfileWidget isCollapsed={!isSidebarOpen && !isMobileOpen} />
+      <div className="shrink-0 space-y-2 border-t p-3">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={toggleSidebar}
+          className={cn("hidden h-8 w-full justify-start gap-2 rounded-full px-3 text-xs text-muted-foreground md:flex", collapsed && "justify-center px-0")}
+        >
+          {isSidebarOpen ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+          {!collapsed && "Collapse"}
+        </Button>
+        <UserProfileWidget isCollapsed={collapsed} />
       </div>
     </div>
   );
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background text-foreground font-body max-w-[100vw]">
+    <div className="flex h-screen w-screen max-w-[100vw] overflow-hidden bg-background font-body text-foreground">
+      <RouteProgress />
 
-      {/* DESKTOP SIDEBAR (FIXED LEFT) */}
       <aside
-        className="hidden md:block shrink-0 border-r border-border/40 transition-all duration-300 ease-[cubic-bezier(0.2,0.8,0.2,1)] will-change-transform z-30"
-        style={{ width: `${currentSidebarWidth}px` }}
+        className="z-30 hidden shrink-0 border-r transition-[width] duration-300 [transition-timing-function:cubic-bezier(0.2,0.8,0.2,1)] md:block"
+        style={{ width: `${currentWidth}px` }}
       >
         {sidebarContent}
       </aside>
 
-      {/* MOBILE SIDEBAR MODAL */}
       <AnimatePresence>
         {isMobileOpen && (
           <>
@@ -616,14 +712,14 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileOpen(false)}
-              className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40 md:hidden"
+              className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm md:hidden"
             />
             <motion.aside
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed top-0 left-0 bottom-0 w-72 bg-background border-r border-border/50 z-50 md:hidden shadow-2xl"
+              transition={{ type: "spring", damping: 28, stiffness: 240 }}
+              className="fixed bottom-0 left-0 top-0 z-50 w-72 border-r shadow-2xl md:hidden"
             >
               {sidebarContent}
             </motion.aside>
@@ -631,55 +727,32 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         )}
       </AnimatePresence>
 
-      {/* FLEX MAIN AREA (TAKES REMAINING WIDTH PERFECTLY) */}
-      <div className="flex-1 flex flex-col min-w-0 bg-muted/10 overflow-hidden relative z-20 transition-all duration-300">
-        {/* HEADER */}
-        <header className="h-16 shrink-0 border-b border-border/40 bg-background/60 backdrop-blur-xl flex items-center justify-between px-4 sm:px-6 relative z-30 transition-all duration-300">
-          <div className="flex items-center gap-3 md:gap-4 overflow-hidden min-w-0">
-            {/* Mobile Toggle */}
-            <Button variant="ghost" size="icon" className="md:hidden shrink-0" onClick={() => setIsMobileOpen(true)}>
+      <div className="relative z-20 flex min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="relative z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b bg-background/75 px-4 backdrop-blur-xl sm:px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <Button variant="ghost" size="icon" className="shrink-0 md:hidden" aria-label="Open navigation" onClick={() => setIsMobileOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
-
-            {/* Desktop Toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hidden md:flex shrink-0 h-9 w-9 hover:bg-muted/80 text-muted-foreground mr-1"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            >
-              <Menu className="h-5 w-5" />
-            </Button>
-
-            <div className="h-5 w-px bg-border/60 mx-1 hidden sm:block shrink-0" />
-
-            <div className="min-w-0 flex-1 truncate py-1">
+            <div className="min-w-0 truncate">
               <Breadcrumbs />
             </div>
           </div>
-
-          <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-4">
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
             <GlobalSearch />
+            <LiveClock className="hidden rounded-full border px-3 py-1.5 text-muted-foreground xl:inline-flex" />
             <NotificationCenter />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 rounded-full text-muted-foreground bg-muted/20 hover:bg-muted/60 transition-colors"
-              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            >
-              <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-            </Button>
+            <ThemeToggle />
           </div>
         </header>
 
-        {/* SCROLLABLE MAIN CONTENT */}
-        <main className="flex-1 overflow-y-auto overflow-x-hidden relative scrollbar-thin scrollbar-thumb-muted-foreground/20 scrollbar-track-transparent">
+        <main className="relative flex-1 overflow-y-auto overflow-x-hidden" data-lenis-prevent>
+          <div aria-hidden className="dotgrid pointer-events-none absolute inset-x-0 top-0 h-72 opacity-50 [mask-image:linear-gradient(#000,transparent)]" />
           <motion.div
-            initial={{ opacity: 0, y: 15 }}
+            key={pathname}
+            initial={{ opacity: 0, y: 14 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="h-full w-full max-w-screen-2xl mx-auto p-4 sm:p-6 lg:p-8"
+            transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
+            className="relative mx-auto w-full max-w-screen-2xl p-4 sm:p-6 lg:p-8"
           >
             {children}
           </motion.div>

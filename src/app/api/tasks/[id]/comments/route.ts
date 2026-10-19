@@ -1,31 +1,12 @@
-import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { auth } from "@/auth";
+import { z } from "zod";
+import { parseBody, route } from "@/lib/api";
+import { addTaskComment } from "@/services/tasks";
 
-export async function POST(req: Request, { params }: { params: { id: string } }) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const dynamic = "force-dynamic";
 
-    try {
-        const body = await req.json();
-        const { content } = body;
+const schema = z.object({ content: z.string().trim().min(1, "Comment content is required").max(10000) });
 
-        if (!content) return NextResponse.json({ error: "Comment content is required" }, { status: 400 });
-
-        const comment = await prisma.taskComment.create({
-            data: {
-                content,
-                taskId: params.id,
-                userId: session.user.id,
-            },
-            include: {
-                user: true
-            }
-        });
-
-        return NextResponse.json(comment);
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to add comment" }, { status: 500 });
-    }
-}
+export const POST = route<{ id: string }>(async ({ req, user, params }) => {
+    const { content } = await parseBody(req, schema);
+    return addTaskComment(user, params.id, content);
+});

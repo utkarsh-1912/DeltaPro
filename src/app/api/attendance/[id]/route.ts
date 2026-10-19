@@ -1,51 +1,26 @@
-export const dynamic = 'force-dynamic';
-import { auth } from "@/auth";
+import { z } from "zod";
 import { prisma } from "@/lib/prisma";
-import { NextResponse } from "next/server";
+import { HttpError, canActOnUser, parseBody, route } from "@/lib/api";
+import { clockOut } from "@/services/attendance";
 
-export async function GET(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+export const dynamic = 'force-dynamic';
 
-    try {
-        const log = await prisma.attendanceLog.findUnique({
-            where: { id: params.id },
-        });
-        return NextResponse.json(log);
-    } catch (error) {
-        return NextResponse.json({ error: "Failed to fetch log" }, { status: 500 });
-    }
-}
+export const GET = route<{ id: string }>(async ({ user, params }) => {
+    const log = await prisma.attendanceLog.findUnique({ where: { id: params.id } });
+    if (!log) throw new HttpError(404, "Attendance log not found.");
+    if (!(await canActOnUser(user, log.userId))) throw new HttpError(403, "Forbidden");
+    return log;
+});
 
-export async function PATCH(
-    req: Request,
-    { params }: { params: { id: string } }
-) {
-    const session = await auth();
-    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+const clockOutSchema = z.object({
+    latitude: z.number().nullable().optional(),
+    longitude: z.number().nullable().optional(),
+    accuracy: z.number().nullable().optional(),
+    reason: z.enum(["OUT_OF_RANGE"]).nullable().optional(),
+}).passthrough();
 
-    try {
-        const body = await req.json();
-        const { logoutTime, logoutLocation, latitude, longitude, accuracy, status } = body;
-
-        const log = await prisma.attendanceLog.update({
-            where: { id: params.id },
-            data: {
-                logoutTime: logoutTime ? new Date(logoutTime) : new Date(),
-                logoutLocation: logoutLocation || "Remote",
-                latitude: latitude || undefined,
-                longitude: longitude || undefined,
-                accuracy: accuracy || undefined,
-                status: status || "LOGGED_OUT",
-            },
-        });
-
-        return NextResponse.json(log);
-    } catch (error) {
-        console.error(error);
-        return NextResponse.json({ error: "Failed to update attendance log" }, { status: 500 });
-    }
-}
+/** Clock out. reason=OUT_OF_RANGE records an automatic clock-out after the server re-checks the geofence. */
+export const PATCH = route<{ id: string }>(async ({ req, user, params }) => {
+    const body = await parseBody(req, clockOutSchema);
+    return clockOut(user, params.id, body);
+});

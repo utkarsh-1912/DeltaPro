@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { EditFullRotaDialog } from "./edit-full-rota-dialog";
+import { ExplainRotaButton } from "./explain-rota-button";
 
 function ClientOnly({ children }: { children: React.ReactNode }) {
     const [hasMounted, setHasMounted] = React.useState(false);
@@ -87,6 +88,7 @@ export function GenerationHistory() {
                                         </div>
                                     </div>
                                     <div className="flex items-center">
+                                      <ExplainRotaButton generationId={gen.id} />
                                       <Button variant="ghost" size="icon" className="shrink-0" onClick={(e) => { e.stopPropagation(); handleEditClick(gen.id); }}>
                                           <Pencil className="h-4 w-4" />
                                           <span className="sr-only">Edit Rota</span>

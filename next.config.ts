@@ -4,7 +4,7 @@ const nextConfig: NextConfig = {
   /* config options here */
   serverExternalPackages: ['@prisma/client', 'prisma'],
   typescript: {
-    ignoreBuildErrors: true,
+    ignoreBuildErrors: false,
   },
   eslint: {
     ignoreDuringBuilds: true,

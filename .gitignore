@@ -39,8 +39,10 @@ next-env.d.ts
 
 .genkit/*
 .env*
+.claude
 
 # firebase
 firebase-debug.log
 firestore-debug.log
 /src/generated/prisma
+!.env.example
