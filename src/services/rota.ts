@@ -34,3 +34,13 @@ export async function emitRotaEvent(type: "rota.published" | "rota.updated" | "r
     await emitEvent(db, { type, subject: { type: "RotaGeneration", id: gen.id }, actor, data: await rotaEventData(gen, db) });
     scheduleDispatch();
 }
+
+/** Data the AI rota explanation needs: shifts, assignments and each member's previous shift. */
+export async function explainRotaInput(generationId: string) {
+    const gen = await prisma.rotaGeneration.findUnique({ where: { id: generationId } });
+    if (!gen) return null;
+    const previous = await prisma.rotaGeneration.findFirst({ where: { teamId: gen.teamId, startDate: { lt: gen.startDate } }, orderBy: { startDate: "desc" } });
+    const data = await rotaEventData(gen);
+    const shifts = await prisma.shift.findMany({ where: { teamId: gen.teamId }, orderBy: { sequence: "asc" } });
+    return { gen, previous, data, shifts };
+}

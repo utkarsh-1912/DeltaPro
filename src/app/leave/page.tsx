@@ -1,24 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useToast } from "@/hooks/use-toast";
-import { CalendarIcon, Plus, CheckCircle2, XCircle, Clock, Download, Filter, User, HelpCircle, Briefcase, HeartPulse, Sparkles } from "lucide-react";
-import { format, differenceInDays, isSameDay } from "date-fns";
+import { CalendarIcon, Check, X, Download, Briefcase, HeartPulse, Sparkles, Plane, Loader2, CalendarOff, Ban } from "lucide-react";
+import { format, isAfter, startOfDay } from "date-fns";
 import type { DateRange } from "react-day-picker";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
+import { PageHeader, StatGrid, Stat, Panel, EmptyState, StatusPill, FieldLabel, downloadCsv } from "@/components/page";
+import { EASE } from "@/components/motion";
 
 type LeaveType = "CASUAL" | "SICK" | "EARNED";
 type LeaveStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
@@ -46,6 +43,31 @@ interface LeaveRequest {
     approver?: { name: string };
 }
 
+const TYPE_META: Record<string, { label: string; icon: typeof Plane }> = {
+    CASUAL: { label: "Casual", icon: Sparkles },
+    SICK: { label: "Sick", icon: HeartPulse },
+    EARNED: { label: "Earned", icon: Briefcase },
+};
+const typeLabel = (t: string) => TYPE_META[t]?.label ?? t.charAt(0) + t.slice(1).toLowerCase();
+
+/** Mirrors the server: leave is charged for weekdays only (holidays are also excluded server-side). */
+function weekdaysInRange(from: Date, to: Date) {
+    let n = 0;
+    const d = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+    const end = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+    while (d <= end) {
+        const dow = d.getDay();
+        if (dow !== 0 && dow !== 6) n++;
+        d.setDate(d.getDate() + 1);
+    }
+    return n;
+}
+
+const dateSpan = (s: string, e: string) => {
+    const a = new Date(s), b = new Date(e);
+    return format(a, "yyyy-MM-dd") === format(b, "yyyy-MM-dd") ? format(a, "MMM d, yyyy") : `${format(a, "MMM d")} – ${format(b, "MMM d, yyyy")}`;
+};
+
 export default function LeavePage() {
     const { data: session } = useSession();
     const { toast } = useToast();
@@ -54,8 +76,9 @@ export default function LeavePage() {
     const [myRequests, setMyRequests] = useState<LeaveRequest[]>([]);
     const [pendingRequests, setPendingRequests] = useState<LeaveRequest[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [busyId, setBusyId] = useState<string | null>(null);
+    const [tab, setTab] = useState("my-leaves");
 
-    // Form states
     const [dateRange, setDateRange] = useState<DateRange | undefined>();
     const [leaveType, setLeaveType] = useState<LeaveType>("CASUAL");
     const [reason, setReason] = useState("");
@@ -64,13 +87,7 @@ export default function LeavePage() {
 
     const isManagerOrAdmin = session?.user?.role === "ADMIN" || session?.user?.role === "HR" || session?.user?.role === "PM";
 
-    useEffect(() => {
-        if (session) {
-            fetchData();
-        }
-    }, [session]);
-
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         setIsLoading(true);
         try {
             const [balanceRes, myReqsRes] = await Promise.all([
@@ -91,23 +108,31 @@ export default function LeavePage() {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [session?.user?.id, isManagerOrAdmin]);
 
-    const calculateDuration = (range: DateRange | undefined, halfDay: boolean) => {
-        if (halfDay) return 0.5;
-        if (!range?.from || !range?.to) return 1.0;
-        return differenceInDays(range.to, range.from) + 1;
-    };
+    useEffect(() => {
+        if (session) fetchData();
+    }, [session, fetchData]);
+
+    const requestedDays = (() => {
+        if (isHalfDay) return 0.5;
+        if (!dateRange?.from) return 0;
+        return weekdaysInRange(dateRange.from, dateRange.to ?? dateRange.from);
+    })();
+    const selectedBalance = balances.find(b => b.type === leaveType);
+    const afterRequest = selectedBalance ? selectedBalance.available - requestedDays : null;
 
     const handleRequestLeave = async () => {
         if (!dateRange?.from) {
-            toast({ variant: "destructive", title: "Missing Dates", description: "Please select leave dates." });
+            toast({ variant: "destructive", title: "Pick your dates", description: "Select the day or range you'll be away." });
+            return;
+        }
+        if (requestedDays === 0) {
+            toast({ variant: "destructive", title: "No working days selected", description: "The range only covers a weekend." });
             return;
         }
 
-        const duration = calculateDuration(dateRange, isHalfDay);
         setIsSubmitting(true);
-
         try {
             const res = await fetch("/api/leave/requests", {
                 method: "POST",
@@ -118,19 +143,20 @@ export default function LeavePage() {
                     endDate: (dateRange.to || dateRange.from).toISOString(),
                     reason,
                     isHalfDay,
-                    duration
+                    duration: requestedDays
                 })
             });
 
             if (res.ok) {
-                toast({ title: "Request Submitted", description: "Your leave request is pending approval." });
+                toast({ title: "Request submitted", description: "Your manager has been notified." });
                 setDateRange(undefined);
                 setReason("");
                 setIsHalfDay(false);
+                setTab("my-leaves");
                 fetchData();
             } else {
-                const err = await res.json();
-                toast({ variant: "destructive", title: "Request Failed", description: err.error || "Could not submit request." });
+                const err = await res.json().catch(() => ({}));
+                toast({ variant: "destructive", title: "Request failed", description: err.error || "Could not submit request." });
             }
         } catch (error) {
             toast({ variant: "destructive", title: "Error", description: "Something went wrong." });
@@ -140,6 +166,7 @@ export default function LeavePage() {
     };
 
     const handleAction = async (requestId: string, status: LeaveStatus) => {
+        setBusyId(requestId);
         try {
             const res = await fetch(`/api/leave/requests/${requestId}`, {
                 method: "PATCH",
@@ -148,330 +175,294 @@ export default function LeavePage() {
             });
 
             if (res.ok) {
-                toast({ title: `Request ${status.toLowerCase()}`, description: `Action successful.` });
+                toast({ title: `Request ${status.toLowerCase()}` });
                 fetchData();
             } else {
-                const err = await res.json();
-                toast({ variant: "destructive", title: "Action Failed", description: err.error });
+                const err = await res.json().catch(() => ({}));
+                toast({ variant: "destructive", title: "Action failed", description: err.error });
             }
         } catch (error) {
             toast({ variant: "destructive", title: "Error", description: "Something went wrong." });
+        } finally {
+            setBusyId(null);
         }
     };
 
-    const getStatusBadge = (status: LeaveStatus) => {
-        switch (status) {
-            case "PENDING": return <Badge variant="outline" className="bg-amber-500/10 text-amber-600 border-amber-200">Pending</Badge>;
-            case "APPROVED": return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-600 border-emerald-200">Approved</Badge>;
-            case "REJECTED": return <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">Rejected</Badge>;
-            default: return <Badge variant="secondary">{status}</Badge>;
-        }
-    };
+    const canCancel = (r: LeaveRequest) =>
+        (r.status === "PENDING" || r.status === "APPROVED") && isAfter(new Date(r.startDate), startOfDay(new Date()));
 
-    const getBalanceIcon = (type: string) => {
-        switch (type) {
-            case "SICK": return <HeartPulse className="h-5 w-5 text-rose-500" />;
-            case "CASUAL": return <Sparkles className="h-5 w-5 text-amber-500" />;
-            case "EARNED": return <Briefcase className="h-5 w-5 text-primary" />;
-            default: return <HelpCircle className="h-5 w-5" />;
-        }
-    };
+    const exportHistory = () => downloadCsv(`leave-history-${format(new Date(), "yyyy-MM-dd")}.csv`, myRequests.map(r => ({
+        type: r.type, start: format(new Date(r.startDate), "yyyy-MM-dd"), end: format(new Date(r.endDate), "yyyy-MM-dd"),
+        days: r.duration, halfDay: r.isHalfDay, status: r.status, approver: r.approver?.name ?? "", reason: r.reason ?? "",
+    })));
+
+    const upcoming = myRequests
+        .filter(r => r.status === "APPROVED" && isAfter(new Date(r.endDate), new Date()))
+        .sort((a, b) => +new Date(a.startDate) - +new Date(b.startDate))[0];
 
     return (
         <div className="space-y-8">
-            <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="page-title ">Leave Management</h1>
-                    <p className="text-muted-foreground font-medium">Track your balances and manage time-off requests.</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <Button variant="outline" size="sm" className="hidden sm:flex font-bold">
-                        <Download className="mr-2 h-4 w-4" /> Export Report
-                    </Button>
-                </div>
-            </header>
+            <PageHeader
+                eyebrow="Workforce · Leave"
+                title="Time off"
+                description="Balances, requests and approvals in one place."
+                actions={
+                    <>
+                        <Button variant="outline" onClick={exportHistory} disabled={myRequests.length === 0}>
+                            <Download className="h-4 w-4" /> Export history
+                        </Button>
+                        <Button onClick={() => setTab("request")}><Plane className="h-4 w-4" /> Request leave</Button>
+                    </>
+                }
+            />
 
-            {/* Balance Overview */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {balances.map((balance) => (
-                    <motion.div
-                        key={balance.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                    >
-                        <Card className="border bg-background/60 overflow-hidden group hover:-translate-y-1 transition-all">
-                            <CardHeader className="flex flex-row items-center justify-between pb-2">
-                                <CardTitle className="text-sm font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                                    {balance.type} LEAVE
-                                </CardTitle>
-                                <div className="p-2 rounded-xl bg-muted/50 group-hover:bg-primary/10 transition-colors">
-                                    {getBalanceIcon(balance.type)}
-                                </div>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-4xl font-semibold mb-1">{balance.available}</div>
-                                <div className="flex items-center justify-between text-xs font-medium font-mono uppercase tracking-[0.12em] text-muted-foreground">
-                                    <span>Available</span>
-                                    <span>Total: {balance.total}</span>
-                                </div>
-                                <div className="mt-4 h-2 w-full bg-muted rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${(balance.used / balance.total) * 100}%` }}
-                                        className="h-full bg-primary"
-                                    />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </motion.div>
-                ))}
-            </div>
+            {/* Balances */}
+            {isLoading && balances.length === 0 ? (
+                <div className="grid gap-px overflow-hidden rounded-2xl border bg-border sm:grid-cols-3">
+                    {[0, 1, 2].map(i => <div key={i} className="h-[150px] animate-pulse bg-card" />)}
+                </div>
+            ) : balances.length > 0 ? (
+                <StatGrid>
+                    {balances.map((b) => {
+                        const meta = TYPE_META[b.type];
+                        return (
+                            <Stat
+                                key={b.id}
+                                label={`${typeLabel(b.type)} leave`}
+                                icon={meta?.icon}
+                                value={<>{b.available}<span className="text-xl text-muted-foreground"> / {b.total}</span></>}
+                                hint={`${b.used} used this year`}
+                                progress={b.total ? (b.used / b.total) * 100 : 0}
+                                tone="signal"
+                            />
+                        );
+                    })}
+                    {upcoming && (
+                        <Stat label="Next time off" icon={Plane} value={format(new Date(upcoming.startDate), "MMM d")} hint={`${typeLabel(upcoming.type)} · ${upcoming.duration} day${upcoming.duration === 1 ? "" : "s"}`} />
+                    )}
+                </StatGrid>
+            ) : (
+                <Panel><EmptyState icon={CalendarOff} title="No leave balances yet" description="HR hasn't set up your allowances for this year." /></Panel>
+            )}
 
-            <Tabs defaultValue="my-leaves" className="w-full">
-                <TabsList className="bg-muted/50 p-1 rounded-2xl mb-6">
-                    <TabsTrigger value="my-leaves" className="rounded-xl px-8 font-semibold font-mono uppercase tracking-[0.12em] text-[10px]">My Leaves</TabsTrigger>
-                    <TabsTrigger value="request" className="rounded-xl px-8 font-semibold font-mono uppercase tracking-[0.12em] text-[10px]">Request Leave</TabsTrigger>
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+                <TabsList className="mb-6">
+                    <TabsTrigger value="my-leaves">History</TabsTrigger>
+                    <TabsTrigger value="request">New request</TabsTrigger>
                     {isManagerOrAdmin && (
-                        <TabsTrigger value="approvals" className="rounded-xl px-8 font-semibold font-mono uppercase tracking-[0.12em] text-[10px] relative">
+                        <TabsTrigger value="approvals" className="gap-2">
                             Approvals
-                            {pendingRequests.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-[8px] flex items-center justify-center rounded-full text-white animate-pulse">{pendingRequests.length}</span>}
+                            {pendingRequests.length > 0 && <span className="rounded bg-destructive px-1.5 font-mono text-[10px] text-destructive-foreground">{pendingRequests.length}</span>}
                         </TabsTrigger>
                     )}
                 </TabsList>
 
                 <TabsContent value="my-leaves">
-                    <Card className="border bg-background/60 rounded-2xl">
-                        <CardHeader>
-                            <CardTitle>History</CardTitle>
-                            <CardDescription>Your personal leave request log.</CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="rounded-2xl border border-border/40 overflow-hidden">
-                                <Table>
-                                    <TableHeader className="bg-muted/30">
-                                        <TableRow className="border-border/40 hover:bg-transparent">
-                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Type</TableHead>
-                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Duration</TableHead>
-                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Dates</TableHead>
-                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em]">Status</TableHead>
-                                            <TableHead className="font-semibold text-[10px] font-mono uppercase tracking-[0.12em] text-right">Reason</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {myRequests.length > 0 ? myRequests.map((req) => (
-                                            <TableRow key={req.id} className="border-border/40 hover:bg-muted/20 transition-colors">
-                                                <TableCell className="font-bold">{req.type}</TableCell>
-                                                <TableCell className="font-bold">{req.duration} Days</TableCell>
-                                                <TableCell className="text-muted-foreground font-medium">
-                                                    {format(new Date(req.startDate), "MMM dd")} - {format(new Date(req.endDate), "MMM dd, yyyy")}
-                                                </TableCell>
-                                                <TableCell>{getStatusBadge(req.status)}</TableCell>
-                                                <TableCell className="text-right text-muted-foreground text-sm max-w-[200px] truncate">{req.reason || "—"}</TableCell>
-                                            </TableRow>
-                                        )) : (
-                                            <TableRow>
-                                                <TableCell colSpan={5} className="h-32 text-center text-muted-foreground font-medium italic">No leave history found.</TableCell>
-                                            </TableRow>
-                                        )}
-                                    </TableBody>
-                                </Table>
+                    <Panel title="Your requests" description="Everything you've asked for this year and before." bodyClassName="p-0">
+                        {myRequests.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-secondary/40">
+                                        <tr className="border-b">
+                                            {["Type", "Dates", "Days", "Status", "Reason", ""].map(h => (
+                                                <th key={h} className="h-10 px-6 text-left font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{h}</th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {myRequests.map((req) => (
+                                            <tr key={req.id} className="border-b last:border-0 hover:bg-secondary/40">
+                                                <td className="px-6 py-4 font-medium">{typeLabel(req.type)}{req.isHalfDay && <span className="ml-2 text-xs text-muted-foreground">half day</span>}</td>
+                                                <td className="px-6 py-4 text-muted-foreground">{dateSpan(req.startDate, req.endDate)}</td>
+                                                <td className="px-6 py-4 font-mono tabular-nums">{req.duration}</td>
+                                                <td className="px-6 py-4">
+                                                    <StatusPill status={req.status} />
+                                                    {req.approver && req.status !== "PENDING" && <p className="mt-1 text-xs text-muted-foreground">by {req.approver.name}</p>}
+                                                </td>
+                                                <td className="max-w-[240px] truncate px-6 py-4 text-muted-foreground">{req.reason || "—"}</td>
+                                                <td className="px-6 py-4 text-right">
+                                                    {canCancel(req) && (
+                                                        <Button size="sm" variant="ghost" disabled={busyId === req.id} onClick={() => handleAction(req.id, "CANCELLED")}>
+                                                            {busyId === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Ban className="h-4 w-4" />} Cancel
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
-                        </CardContent>
-                    </Card>
+                        ) : (
+                            <EmptyState icon={Plane} title="No leave taken yet" description="Requests you make will be listed here." action={<Button variant="outline" onClick={() => setTab("request")}>Request leave</Button>} />
+                        )}
+                    </Panel>
                 </TabsContent>
 
                 <TabsContent value="request">
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                        <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}>
-                            <Card className="border bg-background/60 rounded-2xl overflow-hidden">
-                                <CardHeader className="pb-4">
-                                    <CardTitle>Submit Request</CardTitle>
-                                    <CardDescription>Select your leave details below.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-6">
-                                    <div className="space-y-3">
-                                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Type of Leave</Label>
-                                        <Select value={leaveType} onValueChange={(v: LeaveType) => setLeaveType(v)}>
-                                            <SelectTrigger className="h-14 bg-muted/40 border-none rounded-2xl px-6 font-bold focus:ring-2 ring-primary">
-                                                <SelectValue />
-                                            </SelectTrigger>
-                                            <SelectContent className="rounded-2xl border">
-                                                <SelectItem value="CASUAL">Casual Leave</SelectItem>
-                                                <SelectItem value="SICK">Sick Leave</SelectItem>
-                                                <SelectItem value="EARNED">Earned Leave</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Date Selection</Label>
-                                        <Popover>
-                                            <PopoverTrigger asChild>
-                                                <Button
-                                                    variant="outline"
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1.3fr_1fr]">
+                        <Panel title="New request" description="Your manager is notified as soon as you submit.">
+                            <div className="space-y-6 p-6">
+                                <div className="space-y-2">
+                                    <FieldLabel>Leave type</FieldLabel>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {(Object.keys(TYPE_META) as LeaveType[]).map(t => {
+                                            const meta = TYPE_META[t];
+                                            const bal = balances.find(b => b.type === t);
+                                            return (
+                                                <button
+                                                    key={t}
+                                                    type="button"
+                                                    onClick={() => setLeaveType(t)}
+                                                    aria-pressed={leaveType === t}
                                                     className={cn(
-                                                        "w-full h-14 justify-start text-left font-bold bg-muted/40 border-none rounded-2xl px-6 hover:bg-muted/60 transition-all",
-                                                        !dateRange && "text-muted-foreground"
+                                                        "rounded-xl border p-4 text-left transition-colors",
+                                                        leaveType === t ? "border-signal bg-signal/5" : "hover:bg-secondary"
                                                     )}
                                                 >
-                                                    <CalendarIcon className="mr-3 h-5 w-5 text-primary" />
-                                                    {dateRange?.from ? (
-                                                        dateRange.to ? (
-                                                            <>{format(dateRange.from, "LLL dd")} - {format(dateRange.to, "LLL dd, y")}</>
-                                                        ) : (
-                                                            format(dateRange.from, "LLL dd, y")
-                                                        )
-                                                    ) : (
-                                                        <span>Select date range</span>
-                                                    )}
-                                                </Button>
-                                            </PopoverTrigger>
-                                            <PopoverContent className="w-auto p-0 border rounded-2xl overflow-hidden" align="start">
-                                                <Calendar
-                                                    initialFocus
-                                                    mode="range"
-                                                    defaultMonth={dateRange?.from}
-                                                    selected={dateRange}
-                                                    onSelect={setDateRange}
-                                                    numberOfMonths={2}
-                                                    className="p-4"
-                                                />
-                                            </PopoverContent>
-                                        </Popover>
+                                                    <meta.icon className={cn("h-4 w-4", leaveType === t ? "text-signal" : "text-muted-foreground")} />
+                                                    <p className="mt-3 font-medium">{meta.label}</p>
+                                                    <p className="font-mono text-[11px] text-muted-foreground">{bal ? `${bal.available} left` : "—"}</p>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
+                                </div>
 
-                                    <div className="flex items-center justify-between p-6 bg-muted/30 rounded-2xl border border-border/40">
-                                        <div className="space-y-1">
-                                            <Label className="font-semibold text-sm">Half Day Request</Label>
-                                            <p className="text-xs text-muted-foreground font-medium">Check if requesting only half a day.</p>
-                                        </div>
-                                        <Switch
-                                            checked={isHalfDay}
-                                            onCheckedChange={setIsHalfDay}
-                                            className="data-[state=checked]:bg-primary"
-                                        />
+                                <div className="space-y-2">
+                                    <FieldLabel>Dates</FieldLabel>
+                                    <Popover>
+                                        <PopoverTrigger asChild>
+                                            <Button variant="outline" className={cn("h-11 w-full justify-start gap-3 font-normal", !dateRange && "text-muted-foreground")}>
+                                                <CalendarIcon className="h-4 w-4 text-signal" />
+                                                {dateRange?.from ? (
+                                                    dateRange.to && +dateRange.to !== +dateRange.from
+                                                        ? <>{format(dateRange.from, "EEE, MMM d")} – {format(dateRange.to, "EEE, MMM d, y")}</>
+                                                        : format(dateRange.from, "EEEE, MMM d, y")
+                                                ) : "Select a day or range"}
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-0" align="start">
+                                            <Calendar
+                                                initialFocus
+                                                mode="range"
+                                                defaultMonth={dateRange?.from}
+                                                selected={dateRange}
+                                                onSelect={setDateRange}
+                                                numberOfMonths={2}
+                                                disabled={{ before: startOfDay(new Date()) }}
+                                                className="p-3"
+                                            />
+                                        </PopoverContent>
+                                    </Popover>
+                                </div>
+
+                                <label className="flex cursor-pointer items-center justify-between rounded-xl border p-4">
+                                    <div>
+                                        <p className="font-medium">Half day</p>
+                                        <p className="text-sm text-muted-foreground">Away for the morning or afternoon only.</p>
                                     </div>
+                                    <Switch checked={isHalfDay} onCheckedChange={setIsHalfDay} />
+                                </label>
 
-                                    <div className="space-y-3">
-                                        <Label className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-muted-foreground ml-1">Reason (Optional)</Label>
-                                        <Input
-                                            placeholder="Brief explanation..."
-                                            value={reason}
-                                            onChange={(e) => setReason(e.target.value)}
-                                            className="h-14 bg-muted/40 border-none rounded-2xl px-6 font-medium focus:ring-2 ring-primary"
-                                        />
-                                    </div>
+                                <div className="space-y-2">
+                                    <FieldLabel htmlFor="leave-reason">Reason (optional)</FieldLabel>
+                                    <Input id="leave-reason" placeholder="Family event, appointment, travel…" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} />
+                                </div>
 
-                                    <Button
-                                        onClick={handleRequestLeave}
-                                        disabled={isSubmitting}
-                                        className="w-full h-16 rounded-2xl font-semibold text-lg hover:scale-[1.01] transition-all active:scale-[0.98]"
-                                    >
-                                        {isSubmitting ? "Processing..." : "Submit Request"}
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
+                                <Button onClick={handleRequestLeave} disabled={isSubmitting} className="h-11 w-full">
+                                    {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />} Submit request
+                                </Button>
+                            </div>
+                        </Panel>
 
                         <div className="space-y-6">
-                            <Card className="border bg-primary/10 rounded-2xl">
-                                <CardHeader>
-                                    <div className="h-12 w-12 rounded-2xl bg-primary/20 flex items-center justify-center mb-4">
-                                        <Clock className="h-6 w-6 text-primary" />
+                            <section className="relative overflow-hidden rounded-2xl border bg-[hsl(228_45%_6%)] p-8 text-[hsl(225_38%_95%)] grain">
+                                <p className="font-mono-label text-white/50">This request</p>
+                                <AnimatePresence mode="wait">
+                                    <motion.p
+                                        key={requestedDays}
+                                        initial={{ opacity: 0, y: 12 }}
+                                        animate={{ opacity: 1, y: 0 }}
+                                        exit={{ opacity: 0, y: -12 }}
+                                        transition={{ duration: 0.35, ease: EASE }}
+                                        className="mt-4 text-7xl font-semibold tabular-nums tracking-tight"
+                                    >
+                                        {requestedDays}
+                                    </motion.p>
+                                </AnimatePresence>
+                                <p className="font-mono-label mt-1 text-white/50">working day{requestedDays === 1 ? "" : "s"} · {typeLabel(leaveType)}</p>
+                                <div className="mt-8 grid grid-cols-2 gap-px overflow-hidden rounded-xl bg-white/10">
+                                    <div className="bg-[hsl(228_45%_6%)] p-4">
+                                        <p className="font-mono-label text-white/50">Available</p>
+                                        <p className="mt-1 text-2xl font-semibold tabular-nums">{selectedBalance?.available ?? "—"}</p>
                                     </div>
-                                    <CardTitle>Calculation Breakdown</CardTitle>
-                                    <CardDescription className="text-primary/60 font-medium">Estimated impact on your balance.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="flex items-end justify-between">
-                                        <div className="text-5xl font-semibold">{calculateDuration(dateRange, isHalfDay)}</div>
-                                        <div className="text-right">
-                                            <div className="text-xs font-semibold font-mono uppercase tracking-[0.12em] text-primary/60 mb-1">Total Days</div>
-                                            <div className="text-sm font-bold">{leaveType.replace("_", " ")}</div>
-                                        </div>
+                                    <div className="bg-[hsl(228_45%_6%)] p-4">
+                                        <p className="font-mono-label text-white/50">After</p>
+                                        <p className={cn("mt-1 text-2xl font-semibold tabular-nums", afterRequest !== null && afterRequest < 0 && "text-red-400")}>
+                                            {afterRequest ?? "—"}
+                                        </p>
                                     </div>
-                                </CardContent>
-                            </Card>
+                                </div>
+                                {afterRequest !== null && afterRequest < 0 && (
+                                    <p className="mt-4 text-sm text-red-300">This is more than your remaining balance; it may be rejected or treated as unpaid.</p>
+                                )}
+                            </section>
 
-                            <div className="p-8 rounded-2xl bg-muted/30 border border-border/40 space-y-4">
-                                <h4 className="font-semibold text-xs font-mono uppercase tracking-[0.12em] text-muted-foreground">Pro Tips</h4>
-                                <ul className="space-y-3 text-sm font-medium leading-relaxed">
-                                    <li className="flex gap-3">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                                        Requests should be made 48 hours in advance for plan better.
-                                    </li>
-                                    <li className="flex gap-3">
-                                        <div className="h-1.5 w-1.5 rounded-full bg-primary mt-2 shrink-0" />
-                                        Sick leave requires documentation for more than 2 consecutive days.
-                                    </li>
+                            <Panel title="Before you submit">
+                                <ul className="space-y-3 p-6 text-sm text-muted-foreground">
+                                    <li className="flex gap-3"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-signal" />Weekends and company holidays aren't charged against your balance.</li>
+                                    <li className="flex gap-3"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-signal" />Approved leave is blocked out on the rota automatically.</li>
+                                    <li className="flex gap-3"><span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-signal" />You can cancel a request any time before it starts; approved days are refunded.</li>
                                 </ul>
-                            </div>
+                            </Panel>
                         </div>
                     </div>
                 </TabsContent>
 
                 {isManagerOrAdmin && (
                     <TabsContent value="approvals">
-                        <Card className="border bg-background/60 rounded-2xl">
-                            <CardHeader>
-                                <CardTitle>Pending Approvals</CardTitle>
-                                <CardDescription>Approve or suggest changes to team leave requests.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    <AnimatePresence>
-                                        {pendingRequests.length > 0 ? pendingRequests.map((req) => (
-                                            <motion.div
+                        <Panel title="Waiting for you" description="Leave requests from people you manage." bodyClassName="p-0">
+                            {pendingRequests.length > 0 ? (
+                                <ul>
+                                    <AnimatePresence initial={false}>
+                                        {pendingRequests.map((req) => (
+                                            <motion.li
                                                 key={req.id}
-                                                initial={{ opacity: 0, scale: 0.95 }}
-                                                animate={{ opacity: 1, scale: 1 }}
-                                                exit={{ opacity: 0, scale: 0.95 }}
-                                                className="p-6 rounded-2xl bg-muted/30 border border-border/40 flex flex-col md:flex-row items-center justify-between gap-6"
+                                                layout
+                                                initial={{ opacity: 0, y: 8 }}
+                                                animate={{ opacity: 1, y: 0 }}
+                                                exit={{ opacity: 0, x: 24 }}
+                                                transition={{ ease: EASE }}
+                                                className="flex flex-col gap-4 border-b px-6 py-5 last:border-0 md:flex-row md:items-center md:justify-between"
                                             >
-                                                <div className="flex items-center gap-6 w-full md:w-auto">
-                                                    <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-semibold text-xl">
-                                                        {req.user.name.charAt(0)}
+                                                <div className="flex items-center gap-4">
+                                                    <div className="flex h-10 w-10 items-center justify-center rounded-full border bg-secondary text-sm font-medium">
+                                                        {req.user.name?.split(" ").map(p => p[0]).slice(0, 2).join("")}
                                                     </div>
                                                     <div>
-                                                        <h4 className="font-semibold text-lg">{req.user.name}</h4>
-                                                        <p className="text-xs font-medium text-muted-foreground font-mono uppercase tracking-[0.12em] mb-2">{req.type} • {req.duration} Days</p>
-                                                        <p className="text-xs text-muted-foreground font-medium">
-                                                            {format(new Date(req.startDate), "MMM dd")} - {format(new Date(req.endDate), "MMM dd, yyyy")}
+                                                        <p className="font-medium">{req.user.name}</p>
+                                                        <p className="text-sm text-muted-foreground">
+                                                            {typeLabel(req.type)} · {req.duration} day{req.duration === 1 ? "" : "s"} · {dateSpan(req.startDate, req.endDate)}
                                                         </p>
+                                                        {req.reason && <p className="mt-1 text-sm text-muted-foreground">“{req.reason}”</p>}
                                                     </div>
                                                 </div>
-
-                                                <div className="flex items-center gap-3 w-full md:w-auto">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="lg"
-                                                        onClick={() => handleAction(req.id, "REJECTED")}
-                                                        className="flex-1 md:flex-none h-14 rounded-2xl border-none bg-destructive/10 text-destructive font-semibold hover:bg-destructive/20"
-                                                    >
-                                                        <XCircle className="mr-2 h-5 w-5" /> Reject
+                                                <div className="flex gap-2">
+                                                    <Button variant="outline" size="sm" disabled={busyId === req.id} onClick={() => handleAction(req.id, "REJECTED")}>
+                                                        <X className="h-4 w-4" /> Reject
                                                     </Button>
-                                                    <Button
-                                                        size="lg"
-                                                        onClick={() => handleAction(req.id, "APPROVED")}
-                                                        className="flex-1 md:flex-none h-14 rounded-2xl font-semibold "
-                                                    >
-                                                        <CheckCircle2 className="mr-2 h-5 w-5" /> Approve
+                                                    <Button size="sm" disabled={busyId === req.id} onClick={() => handleAction(req.id, "APPROVED")}>
+                                                        {busyId === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Approve
                                                     </Button>
                                                 </div>
-                                            </motion.div>
-                                        )) : (
-                                            <div className="h-48 flex flex-col items-center justify-center text-center space-y-2 opacity-50">
-                                                <div className="h-12 w-12 rounded-full bg-muted flex items-center justify-center mb-2">
-                                                    <CheckCircle2 className="h-6 w-6 text-muted-foreground" />
-                                                </div>
-                                                <p className="font-semibold font-mono uppercase tracking-[0.12em] text-xs">All caught up!</p>
-                                                <p className="text-sm font-medium">No pending requests to action.</p>
-                                            </div>
-                                        )}
+                                            </motion.li>
+                                        ))}
                                     </AnimatePresence>
-                                </div>
-                            </CardContent>
-                        </Card>
+                                </ul>
+                            ) : (
+                                <EmptyState icon={Check} title="All caught up" description="No leave requests are waiting for you." />
+                            )}
+                        </Panel>
                     </TabsContent>
                 )}
             </Tabs>

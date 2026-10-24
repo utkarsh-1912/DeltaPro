@@ -1,35 +1,14 @@
 import { z } from "zod";
-import { startOfWeek, endOfWeek, differenceInMinutes, subDays } from "date-fns";
-import { prisma } from "@/lib/prisma";
-import { HttpError, canActOnUser, parseBody, route, scopeByUser } from "@/lib/api";
+import { parseBody, route } from "@/lib/api";
 import { clockIn } from "@/services/attendance";
+import { listPersonLogs, listTeamLogs } from "@/services/attendance-queries";
 
 export const dynamic = 'force-dynamic';
-
-const WEEKLY_TARGET_MINUTES = 2400;
-const WORKING_DAYS = 5;
 
 function parseDate(v: string | null): Date | null {
     if (!v) return null;
     const d = new Date(v);
     return Number.isNaN(d.getTime()) ? null : d;
-}
-
-async function weeklyMetrics(userId: string, anchor: Date) {
-    const from = startOfWeek(anchor, { weekStartsOn: 1 });
-    const to = endOfWeek(anchor, { weekStartsOn: 1 });
-    const logs = await prisma.attendanceLog.findMany({ where: { userId, loginTime: { gte: from, lte: to } }, select: { loginTime: true, logoutTime: true } });
-    let totalMinutes = 0;
-    for (const log of logs) {
-        totalMinutes += differenceInMinutes(log.logoutTime ?? new Date(), log.loginTime);
-    }
-    const distinctDays = new Set(logs.map(l => l.loginTime.toDateString())).size;
-    return {
-        weeklyTotal: `${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
-        targetPercentage: Math.min(Math.round((totalMinutes / WEEKLY_TARGET_MINUTES) * 100), 100),
-        attendanceScore: `${Math.min(Math.round((distinctDays / WORKING_DAYS) * 100), 100)}%`,
-        totalMinutes,
-    };
 }
 
 /**
@@ -39,39 +18,9 @@ async function weeklyMetrics(userId: string, anchor: Date) {
  */
 export const GET = route(async ({ req, user }) => {
     const { searchParams } = new URL(req.url);
-    const start = parseDate(searchParams.get("startDate"));
-    const end = parseDate(searchParams.get("endDate"));
-    const range = start || end ? { loginTime: { ...(start ? { gte: start } : {}), ...(end ? { lte: end } : {}) } } : {};
-
-    if (searchParams.get("team") === "true") {
-        const logs = await prisma.attendanceLog.findMany({
-            where: { ...scopeByUser(user), ...(start || end ? range : { loginTime: { gte: subDays(new Date(), 7) } }) },
-            include: { user: { select: { name: true, image: true, role: true } } },
-            orderBy: { loginTime: "desc" },
-            take: 500,
-        });
-        return { logs, metrics: null };
-    }
-
-    const requested = searchParams.get("userId");
-    const targetId = requested && requested !== user.id ? requested : user.id;
-    if (targetId !== user.id && !(await canActOnUser(user, targetId))) throw new HttpError(403, "You can only view your own attendance or your reports'.");
-
-    const logs = await prisma.attendanceLog.findMany({
-        where: { userId: targetId, ...range },
-        include: { user: { select: { name: true, image: true, role: true } } },
-        orderBy: { loginTime: "desc" },
-        take: 500,
-    });
-    // The page needs to know about an open session even when it started before the selected day.
-    if (!logs.some(l => !l.logoutTime)) {
-        const open = await prisma.attendanceLog.findFirst({
-            where: { userId: targetId, logoutTime: null },
-            include: { user: { select: { name: true, image: true, role: true } } },
-        });
-        if (open) logs.unshift(open);
-    }
-    return { logs, metrics: await weeklyMetrics(targetId, start ?? new Date()) };
+    const range = { start: parseDate(searchParams.get("startDate")), end: parseDate(searchParams.get("endDate")) };
+    if (searchParams.get("team") === "true") return listTeamLogs(user, range);
+    return listPersonLogs(user, searchParams.get("userId"), range);
 });
 
 const clockInSchema = z.object({

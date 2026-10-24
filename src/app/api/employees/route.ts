@@ -1,21 +1,13 @@
 import { z } from "zod";
 import { Role } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import { PEOPLE_ADMIN_ROLES, isPeopleAdmin, parseBody, route } from "@/lib/api";
+import { PEOPLE_ADMIN_ROLES, parseBody, route } from "@/lib/api";
 import { PASSWORD_MIN_LENGTH } from "@/lib/password";
-import { createEmployee, publicUser } from "@/services/users";
+import { createEmployee, listEmployees, publicUser } from "@/services/users";
 
 export const dynamic = "force-dynamic";
 
 /** Directory. HR/ADMIN also get inactive people; everyone else sees active employees. */
-export const GET = route(async ({ user }) => {
-    const employees = await prisma.user.findMany({
-        where: isPeopleAdmin(user) ? {} : { isActive: true },
-        include: { profile: true, manager: { select: { id: true, name: true, email: true } } },
-        orderBy: { name: "asc" },
-    });
-    return employees.map(publicUser);
-});
+export const GET = route(async ({ user }) => listEmployees(user));
 
 const schema = z.object({
     email: z.string().email(),

@@ -1,4 +1,6 @@
-import { prisma } from "@/lib/prisma";
+import { rootPrisma as prisma } from "@/lib/prisma";
+import { runAsSystem, runWithTenant } from "@/server/context";
+import { connectorFeature, hasFeature } from "@/server/plans";
 import { buildContext } from "./context";
 import { toDomainEvent, type DomainEvent } from "./events";
 import { getConnector, subscribes } from "./registry";
@@ -12,22 +14,27 @@ const STUCK_AFTER_MS = 10 * 60_000;
 
 /** Claim new outbox events and create one Delivery per subscribed, enabled integration. */
 export async function fanOutEvents(limit = 100): Promise<number> {
-    const claimed = await prisma.$queryRaw<{ id: string; type: string; payload: any }[]>`
+    const claimed = await prisma.$queryRaw<{ id: string; type: string; payload: any; organizationId: string | null }[]>`
         UPDATE "OutboxEvent" SET status = 'DISPATCHING'
         WHERE id IN (
             SELECT id FROM "OutboxEvent" WHERE status = 'PENDING'
             ORDER BY "createdAt" LIMIT ${limit} FOR UPDATE SKIP LOCKED
         )
-        RETURNING id, type, payload`;
+        RETURNING id, type, payload, "organizationId"`;
     if (claimed.length === 0) return 0;
 
     const integrations = await prisma.integration.findMany({ where: { enabled: true } });
+    const orgs = new Map((await prisma.organization.findMany({ select: { id: true, plan: true } })).map(o => [o.id, o.plan]));
     const rows: { eventId: string; integrationId: string }[] = [];
     for (const ev of claimed) {
         const origin = ev.payload?.origin ?? null;
         for (const integration of integrations) {
             const connector = getConnector(integration.provider);
             if (!connector || integration.id === origin) continue;
+            // Tenant boundary: an event only reaches integrations of its own organization.
+            if (integration.organizationId !== ev.organizationId) continue;
+            const feature = connectorFeature(integration.provider);
+            if (feature && integration.organizationId && !hasFeature(orgs.get(integration.organizationId), feature)) continue;
             if (subscribes(connector, integration.events, ev.type)) rows.push({ eventId: ev.id, integrationId: integration.id });
         }
     }
@@ -53,7 +60,9 @@ export async function runDelivery(deliveryId: string): Promise<DeliveryResult> {
     } else {
         try {
             const event: DomainEvent = toDomainEvent(delivery.event);
-            result = await withTimeout(connector.handle(event, buildContext(delivery.integration)), HANDLER_TIMEOUT_MS);
+            const integration = delivery.integration;
+            result = await runWithTenant(integration.organizationId, () =>
+                withTimeout(connector.handle!(event, buildContext(integration)), HANDLER_TIMEOUT_MS));
         } catch (e) {
             result = { ok: false, retryable: true, error: e instanceof Error ? e.message : String(e) };
         }
@@ -106,9 +115,11 @@ export async function runDueDeliveries(limit = 25): Promise<{ ran: number; faile
 }
 
 export async function dispatchPending() {
-    const events = await fanOutEvents();
-    const deliveries = await runDueDeliveries();
-    return { events, ...deliveries };
+    return runAsSystem(async () => {
+        const events = await fanOutEvents();
+        const deliveries = await runDueDeliveries();
+        return { events, ...deliveries };
+    });
 }
 
 /** Put a dead or failed delivery back in the queue. */

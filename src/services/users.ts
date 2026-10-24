@@ -6,6 +6,8 @@ import { hashPassword, isBootstrapAdmin } from "@/lib/password";
 import { linkTeamMembersToUser } from "@/lib/people";
 import { emitEvent, scheduleDispatch, type EventType } from "@/integrations/events";
 import { person } from "./shared";
+import { currentOrgId } from "@/server/context";
+import { assertSeatAvailable } from "./organizations";
 
 const USER_INCLUDE = { profile: true, manager: { select: { id: true, name: true, email: true } } } satisfies Prisma.UserInclude;
 type FullUser = Prisma.UserGetPayload<{ include: typeof USER_INCLUDE }>;
@@ -33,7 +35,7 @@ async function nextEmployeeId(db: Db): Promise<string> {
     const count = await db.employeeProfile.count();
     for (let n = count + 1; n < count + 1000; n++) {
         const id = `EMP-${String(n).padStart(4, "0")}`;
-        if (!(await db.employeeProfile.findUnique({ where: { employeeId: id } }))) return id;
+        if (!(await db.employeeProfile.findFirst({ where: { employeeId: id } }))) return id;
     }
     return `EMP-${Date.now()}`;
 }
@@ -52,6 +54,8 @@ export type EmployeeInput = {
 };
 
 export async function createEmployee(actor: SessionUser | null, input: EmployeeInput, opts: { origin?: string | null } = {}) {
+    const orgId = currentOrgId();
+    if (orgId) await assertSeatAvailable(orgId);
     const email = input.email.toLowerCase().trim();
     if (input.role === Role.ADMIN && actor && actor.role !== Role.ADMIN) throw new HttpError(403, "Only an admin can create another admin.");
     const user = await prisma.$transaction(async tx => {
@@ -64,6 +68,7 @@ export async function createEmployee(actor: SessionUser | null, input: EmployeeI
                 managerId: input.managerId || null,
                 profile: {
                     create: {
+                        organizationId: currentOrgId(),
                         employeeId: input.employeeId || (await nextEmployeeId(tx)),
                         department: input.department ?? null,
                         designation: input.designation ?? null,
@@ -100,6 +105,10 @@ export async function updateEmployee(actor: SessionUser | null, userId: string, 
 
     const isActive = patch.isActive ?? (patch.status ? !["INACTIVE", "TERMINATED"].includes(patch.status) : undefined);
     const profileStatus = patch.status ?? (isActive === undefined ? undefined : isActive ? "ACTIVE" : "INACTIVE");
+    if (isActive === true && !before.isActive) {
+        const orgId = currentOrgId();
+        if (orgId) await assertSeatAvailable(orgId);
+    }
     const user = await prisma.$transaction(async tx => {
         const updated = await tx.user.update({
             where: { id: userId },
@@ -111,6 +120,7 @@ export async function updateEmployee(actor: SessionUser | null, userId: string, 
                 profile: {
                     upsert: {
                         create: {
+                            organizationId: currentOrgId(),
                             employeeId: patch.employeeId || (await nextEmployeeId(tx)),
                             department: patch.department ?? null,
                             designation: patch.designation ?? null,
@@ -154,7 +164,7 @@ export async function upsertFromDirectory(cmd: {
     const manager = cmd.managerEmail ? await prisma.user.findFirst({ where: { email: { equals: cmd.managerEmail, mode: "insensitive" } }, select: { id: true } }) : null;
     const existing = await prisma.user.findUnique({ where: { email } });
     if (cmd.employeeId) {
-        const clash = await prisma.employeeProfile.findUnique({ where: { employeeId: cmd.employeeId } });
+        const clash = await prisma.employeeProfile.findFirst({ where: { employeeId: cmd.employeeId } });
         if (clash && clash.userId !== existing?.id) cmd = { ...cmd, employeeId: undefined };
     }
     if (!existing) {
@@ -166,4 +176,32 @@ export async function upsertFromDirectory(cmd: {
         managerId: manager ? manager.id : undefined, isActive: cmd.active ?? undefined,
     }, { origin });
     return { created: false, user: updated };
+}
+
+// ---------- Directory reads ----------
+
+/** Directory. HR/ADMIN also see inactive people; everyone else sees active employees. */
+export async function listEmployees(actor: SessionUser) {
+    const people = await prisma.user.findMany({
+        where: actor.role === Role.ADMIN || actor.role === Role.HR ? {} : { isActive: true },
+        include: { profile: true, manager: { select: { id: true, name: true, email: true } } },
+        orderBy: { name: "asc" },
+    });
+    return people.map(publicUser);
+}
+
+export async function getEmployee(id: string) {
+    const user = await prisma.user.findUnique({
+        where: { id },
+        include: { profile: true, manager: { select: { id: true, name: true, email: true } }, subordinates: { select: { id: true, name: true, email: true } } },
+    });
+    if (!user) throw new HttpError(404, "Employee not found.");
+    return publicUser(user);
+}
+
+/** Admin-only password reset for people without email access. */
+export async function setPassword(actor: SessionUser, userId: string, password: string) {
+    if (actor.role !== Role.ADMIN) throw new HttpError(403, "Only an admin can set passwords.");
+    await prisma.user.update({ where: { id: userId }, data: { passwordHash: await hashPassword(password) } });
+    await audit(prisma, actor.id, "user.password_set", "User", userId);
 }

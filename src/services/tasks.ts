@@ -150,6 +150,6 @@ export async function addTaskComment(author: { id: string } & Partial<SessionUse
 
 export async function findTask(ref: { taskId?: string; taskKey?: string }) {
     if (ref.taskId) return prisma.task.findUnique({ where: { id: ref.taskId } });
-    if (ref.taskKey) return prisma.task.findUnique({ where: { key: ref.taskKey } });
+    if (ref.taskKey) return prisma.task.findFirst({ where: { key: ref.taskKey } });
     return null;
 }

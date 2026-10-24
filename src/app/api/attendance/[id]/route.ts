@@ -1,16 +1,11 @@
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { HttpError, canActOnUser, parseBody, route } from "@/lib/api";
+import { parseBody, route } from "@/lib/api";
 import { clockOut } from "@/services/attendance";
+import { getLog } from "@/services/attendance-queries";
 
 export const dynamic = 'force-dynamic';
 
-export const GET = route<{ id: string }>(async ({ user, params }) => {
-    const log = await prisma.attendanceLog.findUnique({ where: { id: params.id } });
-    if (!log) throw new HttpError(404, "Attendance log not found.");
-    if (!(await canActOnUser(user, log.userId))) throw new HttpError(403, "Forbidden");
-    return log;
-});
+export const GET = route<{ id: string }>(async ({ user, params }) => getLog(user, params.id));
 
 const clockOutSchema = z.object({
     latitude: z.number().nullable().optional(),

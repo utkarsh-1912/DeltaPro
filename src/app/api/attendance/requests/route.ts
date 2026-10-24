@@ -1,23 +1,11 @@
 import { z } from "zod";
-import { prisma } from "@/lib/prisma";
-import { HttpError, canActOnUser, isManager, parseBody, route, scopeByUser } from "@/lib/api";
+import { HttpError, isManager, parseBody, route } from "@/lib/api";
+import { listRegularizations } from "@/services/attendance-queries";
 import { REGULARIZATION_TYPES, createRegularization, decideRegularization } from "@/services/attendance";
 
 export const dynamic = 'force-dynamic';
 
-export const GET = route(async ({ req, user }) => {
-    const userId = new URL(req.url).searchParams.get("userId");
-    if (userId && !(await canActOnUser(user, userId))) throw new HttpError(403, "Forbidden");
-    return prisma.attendanceRequest.findMany({
-        where: userId ? { userId } : scopeByUser(user),
-        include: {
-            user: { select: { name: true, image: true, role: true } },
-            approver: { select: { name: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 500,
-    });
-});
+export const GET = route(async ({ req, user }) => listRegularizations(user, new URL(req.url).searchParams.get("userId")));
 
 const createSchema = z.object({
     type: z.enum(REGULARIZATION_TYPES),

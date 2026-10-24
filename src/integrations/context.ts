@@ -1,5 +1,5 @@
 import type { Integration } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { rootPrisma as prisma } from "@/lib/prisma";
 import { decryptJson, encryptJson } from "./crypto";
 import { appBaseUrl } from "./http";
 import type { ConnectorContext } from "./types";

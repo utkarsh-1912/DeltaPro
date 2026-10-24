@@ -44,6 +44,7 @@ model Session {
 
 model User {
   id            String    @id @default(cuid())
+  organizationId String?
   name          String?
   email         String?   @unique
   emailVerified DateTime?
@@ -73,10 +74,27 @@ model User {
   rotaMemberships       TeamMember[]
   auditLogs             AuditLog[]
   integrationsCreated   Integration[]
+  documents             Document[]      @relation("DocumentOwner")
+  documentAcks          DocumentAck[]
+  checklists            Checklist[]     @relation("ChecklistSubject")
+  checklistTasks        ChecklistTask[] @relation("ChecklistAssignee")
+  expenseClaims         ExpenseClaim[]  @relation("ExpenseClaimant")
+  approvedExpenses      ExpenseClaim[]  @relation("ExpenseApprover")
+  assets                Asset[]
+  salaryStructure       SalaryStructure?
+  payslips              Payslip[]
+  goals                 Goal[]
+  reviewsReceived       Review[]        @relation("Reviewee")
+  reviewsGiven          Review[]        @relation("Reviewer")
+  feedbackGiven         Feedback[]      @relation("FeedbackFrom")
+  feedbackReceived      Feedback[]      @relation("FeedbackTo")
+
+  @@index([organizationId])
 }
 
 model LeaveBalance {
   id          String   @id @default(cuid())
+  organizationId String?
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   type        String   // e.g., CASUAL, SICK, EARNED
@@ -87,6 +105,8 @@ model LeaveBalance {
   updatedAt   DateTime @updatedAt
 
   @@unique([userId, type, year])
+
+  @@index([organizationId])
 }
 
 model VerificationToken {
@@ -100,16 +120,20 @@ model VerificationToken {
 
 model Team {
   id      String       @id @default(cuid())
+  organizationId String?
   name    String
   pmId    String?
   members TeamMember[]
   shifts  Shift[]
   rotas   RotaGeneration[]
   projects Project[]
+
+  @@index([organizationId])
 }
 
 model TeamMember {
   id           String  @id @default(cuid())
+  organizationId String?
   name         String
   email        String
   teamId       String?
@@ -122,10 +146,13 @@ model TeamMember {
 
   @@index([teamId])
   @@index([userId])
+
+  @@index([organizationId])
 }
 
 model Shift {
   id        String   @id @default(cuid())
+  organizationId String?
   name      String
   startTime String
   endTime   String
@@ -136,19 +163,25 @@ model Shift {
   maxTeam   Int
   teamId    String
   team      Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model Leave {
   id        String     @id @default(cuid())
+  organizationId String?
   memberId  String
   member    TeamMember @relation(fields: [memberId], references: [id], onDelete: Cascade)
   startDate String
   endDate   String
   type      String
+
+  @@index([organizationId])
 }
 
 model RotaGeneration {
   id                      String            @id @default(cuid())
+  organizationId String?
   startDate               String
   endDate                 String
   teamId                  String
@@ -161,18 +194,24 @@ model RotaGeneration {
   comments                Json?
   adhoc                   Json?
   weekendRotas            WeekendRota[]
+
+  @@index([organizationId])
 }
 
 model WeekendRota {
   id           String         @id @default(cuid())
+  organizationId String?
   date         String
   memberId     String
   generationId String
   generation   RotaGeneration @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
 }
 
 model AttendanceLog {
   id             String   @id @default(cuid())
+  organizationId String?
   userId         String
   loginTime      DateTime @default(now())
   logoutTime     DateTime?
@@ -192,10 +231,13 @@ model AttendanceLog {
 
   @@index([userId, loginTime])
   @@index([status])
+
+  @@index([organizationId])
 }
 
 model AttendanceRequest {
   id          String   @id @default(cuid())
+  organizationId String?
   userId      String
   user        User     @relation("UserAttendanceRequests", fields: [userId], references: [id])
   type        String   // CLOCK_IN, CLOCK_OUT, FULL_DAY
@@ -208,10 +250,13 @@ model AttendanceRequest {
   updatedAt   DateTime @updatedAt
 
   @@index([userId, status])
+
+  @@index([organizationId])
 }
 
 model AttendanceSettings {
   id                String  @id @default(cuid())
+  organizationId String? @unique
   geofencingEnabled Boolean @default(true)
   officeLat         Float   @default(19.0760) // Default Mumbai
   officeLng         Float   @default(72.8777)
@@ -225,8 +270,9 @@ model AttendanceSettings {
 
 model Project {
   id          String   @id @default(cuid())
+  organizationId String?
   name        String
-  key         String   @unique
+  key         String
   description String?
   ownerId     String
   owner       User     @relation(fields: [ownerId], references: [id])
@@ -235,6 +281,9 @@ model Project {
   tasks       Task[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
 }
 
 enum TaskStatus {
@@ -260,7 +309,8 @@ enum TaskType {
 
 model Task {
   id          String        @id @default(cuid())
-  key         String        @unique
+  organizationId String?
+  key         String
   title       String
   description String?
   status      TaskStatus    @default(TODO)
@@ -276,12 +326,16 @@ model Task {
   createdAt      DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
 
+  @@unique([organizationId, key])
   @@index([projectId, status])
   @@index([assigneeId])
+
+  @@index([organizationId])
 }
 
 model TaskComment {
   id        String   @id @default(cuid())
+  organizationId String?
   content   String   @db.Text
   taskId    String
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -289,10 +343,13 @@ model TaskComment {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model Workspace {
   id          String   @id @default(cuid())
+  organizationId String?
   name        String
   description String?
   ownerId     String
@@ -300,10 +357,13 @@ model Workspace {
   pages       Page[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([organizationId])
 }
 
 model Page {
   id          String    @id @default(cuid())
+  organizationId String?
   title       String
   content     String?   @db.Text
   parentId    String?
@@ -315,13 +375,16 @@ model Page {
   author      User      @relation(fields: [authorId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+
+  @@index([organizationId])
 }
 
 model EmployeeProfile {
   id              String   @id @default(cuid())
+  organizationId String?
   userId          String   @unique
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  employeeId      String   @unique
+  employeeId      String
   department      String?
   designation     String?
   phoneNumber     String?
@@ -330,6 +393,9 @@ model EmployeeProfile {
   status          String   @default("ACTIVE")
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, employeeId])
+  @@index([organizationId])
 }
 
 enum LeaveStatus {
@@ -341,6 +407,7 @@ enum LeaveStatus {
 
 model LeaveRequest {
   id          String      @id @default(cuid())
+  organizationId String?
   userId      String
   user        User        @relation("UserLeaves", fields: [userId], references: [id])
   type        String      // e.g., CASUAL, SICK, EARNED
@@ -358,10 +425,13 @@ model LeaveRequest {
 
   @@index([userId, status])
   @@index([startDate])
+
+  @@index([organizationId])
 }
 
 model Notification {
   id          String   @id @default(cuid())
+  organizationId String?
   userId      String
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title       String
@@ -371,10 +441,13 @@ model Notification {
   createdAt   DateTime @default(now())
 
   @@index([userId, read])
+
+  @@index([organizationId])
 }
 
 model AuditLog {
   id         String   @id @default(cuid())
+  organizationId String?
   actorId    String?
   actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
   action     String   // e.g. leave.approved, user.role_changed, integration.updated
@@ -385,12 +458,15 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+
+  @@index([organizationId])
 }
 
 // ---------- Connectors ----------
 
 model Integration {
   id          String   @id @default(cuid())
+  organizationId String?
   provider    String   // slack, teams, email, google_calendar, outlook, jira, github, bamboohr, hris_webhook, webhook, scim, device
   name        String
   enabled     Boolean  @default(true)
@@ -404,10 +480,13 @@ model Integration {
   updatedAt   DateTime @updatedAt
   deliveries  Delivery[]
   links       ExternalLink[]
+
+  @@index([organizationId])
 }
 
 model OutboxEvent {
   id         String     @id @default(cuid())
+  organizationId String?
   type       String
   version    Int        @default(1)
   payload    Json
@@ -416,6 +495,8 @@ model OutboxEvent {
   deliveries Delivery[]
 
   @@index([status, createdAt])
+
+  @@index([organizationId])
 }
 
 model Delivery {
@@ -453,4 +534,354 @@ model InboundEvent {
   id         String   @id // provider-scoped delivery id
   provider   String
   receivedAt DateTime @default(now())
+}
+
+// ---------- Tenancy and plans ----------
+
+enum Plan {
+  STARTER
+  GROWTH
+  ENTERPRISE
+}
+
+/// A customer company. Tenant-owned rows carry organizationId, which the Prisma
+/// extension in src/server/db/tenant.ts fills in and filters on automatically.
+model Organization {
+  id              String   @id @default(cuid())
+  name            String
+  slug            String   @unique
+  domain          String?  @unique // email domain, e.g. acme.com
+  allowDomainJoin Boolean  @default(false) // people with @domain emails join this org on sign-up / SSO
+  plan            Plan     @default(STARTER)
+  seatLimit       Int?     // overrides the plan default when set
+  status          String   @default("ACTIVE") // ACTIVE, SUSPENDED
+  country         String   @default("IN")
+  currency        String   @default("INR")
+  timezone        String   @default("Asia/Kolkata")
+  ptState         String?  // professional tax state code, e.g. MH, KA
+  payrollSettings Json?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Holiday {
+  id             String   @id @default(cuid())
+  organizationId String?
+  date           DateTime // UTC midnight
+  name           String
+  optional       Boolean  @default(false) // restricted holiday: still a working day
+  createdAt      DateTime @default(now())
+
+  @@unique([organizationId, date])
+  @@index([organizationId])
+}
+
+// ---------- Documents and policies ----------
+
+model Document {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String?  // owner employee; null = company-wide document or policy
+  user           User?    @relation("DocumentOwner", fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  category       String   // POLICY, CONTRACT, ID_PROOF, CERTIFICATE, RECEIPT, OTHER
+  fileName       String
+  mimeType       String
+  size           Int
+  content        Bytes
+  requiresAck    Boolean  @default(false)
+  uploadedById   String?
+  createdAt      DateTime @default(now())
+  acks           DocumentAck[]
+
+  @@index([organizationId, userId])
+  @@index([organizationId, category])
+}
+
+model DocumentAck {
+  id             String   @id @default(cuid())
+  organizationId String?
+  documentId     String
+  document       Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  acknowledgedAt DateTime @default(now())
+
+  @@unique([documentId, userId])
+  @@index([organizationId])
+}
+
+// ---------- Onboarding and offboarding ----------
+
+model ChecklistTemplate {
+  id             String   @id @default(cuid())
+  organizationId String?
+  name           String
+  kind           String   // ONBOARDING, OFFBOARDING
+  items          Json     // [{ title, owner: HR|MANAGER|EMPLOYEE|IT, dueOffsetDays }]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model Checklist {
+  id             String    @id @default(cuid())
+  organizationId String?
+  userId         String
+  user           User      @relation("ChecklistSubject", fields: [userId], references: [id], onDelete: Cascade)
+  kind           String    // ONBOARDING, OFFBOARDING
+  templateId     String?
+  status         String    @default("OPEN") // OPEN, DONE
+  startDate      DateTime
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+  tasks          ChecklistTask[]
+
+  @@index([organizationId, status])
+  @@index([userId])
+}
+
+model ChecklistTask {
+  id             String    @id @default(cuid())
+  organizationId String?
+  checklistId    String
+  checklist      Checklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+  title          String
+  owner          String    // HR, MANAGER, EMPLOYEE, IT
+  assigneeId     String?
+  assignee       User?     @relation("ChecklistAssignee", fields: [assigneeId], references: [id], onDelete: SetNull)
+  dueDate        DateTime?
+  done           Boolean   @default(false)
+  doneAt         DateTime?
+  doneById       String?
+  sort           Int       @default(0)
+
+  @@index([organizationId, assigneeId, done])
+  @@index([checklistId])
+}
+
+// ---------- Expenses and assets ----------
+
+model ExpenseClaim {
+  id             String    @id @default(cuid())
+  organizationId String?
+  userId         String
+  user           User      @relation("ExpenseClaimant", fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  category       String    // TRAVEL, MEALS, LODGING, SUPPLIES, INTERNET, OTHER
+  amount         Float
+  currency       String    @default("INR")
+  spentOn        DateTime
+  description    String?
+  receiptId      String?   // Document id
+  status         String    @default("SUBMITTED") // SUBMITTED, APPROVED, REJECTED, REIMBURSED, CANCELLED
+  approverId     String?
+  approver       User?     @relation("ExpenseApprover", fields: [approverId], references: [id], onDelete: SetNull)
+  decidedAt      DateTime?
+  decisionNote   String?
+  payslipId      String?   // set when paid through payroll
+  reimbursedAt   DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([organizationId, status])
+  @@index([userId])
+}
+
+model Asset {
+  id             String    @id @default(cuid())
+  organizationId String?
+  tag            String    // e.g. LAP-0042
+  name           String
+  category       String    // LAPTOP, MONITOR, PHONE, ACCESS_CARD, FURNITURE, OTHER
+  serialNumber   String?
+  purchaseDate   DateTime?
+  cost           Float?
+  status         String    @default("AVAILABLE") // AVAILABLE, ASSIGNED, IN_REPAIR, RETIRED
+  assignedToId   String?
+  assignedTo     User?     @relation(fields: [assignedToId], references: [id], onDelete: SetNull)
+  assignedAt     DateTime?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  events         AssetEvent[]
+
+  @@unique([organizationId, tag])
+  @@index([organizationId, status])
+  @@index([assignedToId])
+}
+
+model AssetEvent {
+  id             String   @id @default(cuid())
+  organizationId String?
+  assetId        String
+  asset          Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  type           String   // CREATED, ASSIGNED, RETURNED, REPAIR, RETIRED
+  userId         String?
+  actorId        String?
+  note           String?
+  at             DateTime @default(now())
+
+  @@index([assetId])
+}
+
+// ---------- Payroll ----------
+
+model SalaryStructure {
+  id             String   @id @default(cuid())
+  organizationId String?
+  userId         String   @unique
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  annualCtc      Float
+  basicPercent   Float    @default(50)  // of monthly gross
+  hraPercent     Float    @default(40)  // of basic (50 for metro cities)
+  pfEnabled      Boolean  @default(true)
+  pfCapped       Boolean  @default(true) // PF on wages capped at 15,000
+  esiEnabled     Boolean  @default(true) // applied only while gross <= 21,000
+  ptEnabled      Boolean  @default(true)
+  taxRegime      String   @default("NEW") // NEW, OLD
+  pan            String?
+  uan            String?
+  bankAccount    String?
+  ifsc           String?
+  effectiveFrom  DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([organizationId])
+}
+
+model PayrollRun {
+  id             String    @id @default(cuid())
+  organizationId String?
+  month          String    // YYYY-MM
+  status         String    @default("DRAFT") // DRAFT, FINALIZED, PAID
+  totals         Json?
+  createdById    String?
+  processedAt    DateTime  @default(now())
+  finalizedAt    DateTime?
+  paidAt         DateTime?
+  payslips       Payslip[]
+
+  @@unique([organizationId, month])
+  @@index([organizationId])
+}
+
+model Payslip {
+  id                    String     @id @default(cuid())
+  organizationId        String?
+  runId                 String
+  run                   PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  userId                String
+  user                  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  month                 String
+  workingDays           Float
+  paidDays              Float
+  lopDays               Float
+  earnings              Json       // [{ code, label, amount }]
+  deductions            Json
+  employerContributions Json
+  gross                 Float
+  totalDeductions       Float
+  reimbursements        Float      @default(0)
+  net                   Float
+  published             Boolean    @default(false)
+
+  @@unique([runId, userId])
+  @@index([organizationId, userId])
+}
+
+// ---------- Performance ----------
+
+model ReviewCycle {
+  id             String   @id @default(cuid())
+  organizationId String?
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  status         String   @default("DRAFT") // DRAFT, ACTIVE, CLOSED
+  includeSelf    Boolean  @default(true)
+  includeManager Boolean  @default(true)
+  includePeer    Boolean  @default(false)
+  questions      Json     // [{ id, text }]
+  createdById    String?
+  createdAt      DateTime @default(now())
+  reviews        Review[]
+  goals          Goal[]
+
+  @@index([organizationId])
+}
+
+model Goal {
+  id             String       @id @default(cuid())
+  organizationId String?
+  ownerId        String
+  owner          User         @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  cycleId        String?
+  cycle          ReviewCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  parentId       String?
+  parent         Goal?        @relation("GoalAlignment", fields: [parentId], references: [id], onDelete: SetNull)
+  children       Goal[]       @relation("GoalAlignment")
+  title          String
+  description    String?
+  scope          String       @default("INDIVIDUAL") // INDIVIDUAL, TEAM, COMPANY
+  status         String       @default("ON_TRACK")   // ON_TRACK, AT_RISK, OFF_TRACK, COMPLETED
+  progress       Float        @default(0)
+  dueDate        DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  keyResults     KeyResult[]
+
+  @@index([organizationId, ownerId])
+}
+
+model KeyResult {
+  id             String   @id @default(cuid())
+  organizationId String?
+  goalId         String
+  goal           Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  title          String
+  unit           String   @default("%")
+  startValue     Float    @default(0)
+  targetValue    Float
+  currentValue   Float    @default(0)
+  updatedAt      DateTime @updatedAt
+
+  @@index([goalId])
+}
+
+model Review {
+  id             String      @id @default(cuid())
+  organizationId String?
+  cycleId        String
+  cycle          ReviewCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  revieweeId     String
+  reviewee       User        @relation("Reviewee", fields: [revieweeId], references: [id], onDelete: Cascade)
+  reviewerId     String
+  reviewer       User        @relation("Reviewer", fields: [reviewerId], references: [id], onDelete: Cascade)
+  kind           String      // SELF, MANAGER, PEER
+  status         String      @default("PENDING") // PENDING, SUBMITTED
+  rating         Int?        // 1-5
+  answers        Json?       // { questionId: text }
+  summary        String?
+  submittedAt    DateTime?
+
+  @@unique([cycleId, revieweeId, reviewerId, kind])
+  @@index([organizationId, reviewerId, status])
+}
+
+model Feedback {
+  id             String   @id @default(cuid())
+  organizationId String?
+  fromId         String
+  from           User     @relation("FeedbackFrom", fields: [fromId], references: [id], onDelete: Cascade)
+  toId           String
+  to             User     @relation("FeedbackTo", fields: [toId], references: [id], onDelete: Cascade)
+  kind           String   @default("PRAISE") // PRAISE, CONSTRUCTIVE
+  body           String
+  visibility     String   @default("PRIVATE") // PRIVATE (recipient + their manager), PUBLIC
+  createdAt      DateTime @default(now())
+
+  @@index([organizationId, toId])
 }

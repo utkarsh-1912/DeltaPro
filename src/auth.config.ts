@@ -18,6 +18,9 @@ export const authConfig = {
             if (token && session.user) {
                 session.user.role = token.role as string;
                 session.user.id = token.id as string;
+                session.user.organizationId = (token.organizationId as string | null) ?? null;
+                session.user.orgName = (token.orgName as string | null) ?? null;
+                session.user.plan = (token.plan as string | null) ?? null;
             }
             return session;
         }

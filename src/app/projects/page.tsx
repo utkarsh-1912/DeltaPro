@@ -1,28 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Briefcase, Users, Layout, MoreVertical, Search, Star, Clock, Loader2 } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { Plus, Briefcase, Search, Loader2, ArrowUpRight, CheckCircle2, Activity, ListChecks, Layers } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Progress } from "@/components/ui/progress";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { PageHeader, StatGrid, Stat, Panel, EmptyState, StatusPill, FieldLabel, PersonAvatar } from "@/components/page";
+import { EASE } from "@/components/motion";
+
+type Filter = "all" | "In Progress" | "Not Started" | "Completed";
+const statusKey = (s?: string) => (s === "Completed" ? "DONE" : s === "In Progress" ? "IN_PROGRESS" : "PENDING");
 
 export default function ProjectsPage() {
     const { toast } = useToast();
+    const { data: session } = useSession();
+    const canCreate = !!session?.user;
+
     const [projects, setProjects] = useState<any[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
+    const [filter, setFilter] = useState<Filter>("all");
 
-    // Create Project State
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [newProject, setNewProject] = useState({ name: "", key: "", description: "" });
@@ -43,15 +48,21 @@ export default function ProjectsPage() {
 
     useEffect(() => {
         fetchProjects();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Suggest a key from the name until the user edits the key themselves.
+    const [keyTouched, setKeyTouched] = useState(false);
+    const suggestKey = (name: string) =>
+        name.split(/\s+/).filter(Boolean).map(w => w[0]).join("").replace(/[^A-Za-z0-9]/g, "").slice(0, 4).toUpperCase()
+        || name.replace(/[^A-Za-z0-9]/g, "").slice(0, 3).toUpperCase();
 
     const handleCreateProject = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newProject.name || !newProject.key) {
-            toast({ title: "Validation Error", description: "Name and Key are required.", variant: "destructive" });
+            toast({ title: "Name and key are required", variant: "destructive" });
             return;
         }
-
         setIsCreating(true);
         try {
             const res = await fetch("/api/projects", {
@@ -63,15 +74,15 @@ export default function ProjectsPage() {
                     description: newProject.description
                 }),
             });
-
             if (res.ok) {
-                toast({ title: "Project Created", description: `${newProject.name} has been added successfully.` });
+                toast({ title: "Project created", description: newProject.name });
                 setIsCreateOpen(false);
                 setNewProject({ name: "", key: "", description: "" });
+                setKeyTouched(false);
                 fetchProjects();
             } else {
-                const data = await res.json();
-                toast({ title: "Error", description: data.error || "Failed to create project", variant: "destructive" });
+                const data = await res.json().catch(() => ({}));
+                toast({ title: "Could not create project", description: data.error || "Try a different key.", variant: "destructive" });
             }
         } catch (error) {
             toast({ title: "Error", description: "An unexpected error occurred.", variant: "destructive" });
@@ -80,168 +91,177 @@ export default function ProjectsPage() {
         }
     };
 
-    const filteredProjects = projects.filter((p: any) =>
-        p.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.key?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const counts = useMemo(() => ({
+        all: projects.length,
+        "In Progress": projects.filter(p => p.metrics?.status === "In Progress").length,
+        "Not Started": projects.filter(p => !p.metrics?.status || p.metrics?.status === "Not Started").length,
+        Completed: projects.filter(p => p.metrics?.status === "Completed").length,
+    }), [projects]);
+    const totalTasks = projects.reduce((s, p) => s + (p.metrics?.taskCount || 0), 0);
+    const avgProgress = projects.length ? Math.round(projects.reduce((s, p) => s + (p.metrics?.progress || 0), 0) / projects.length) : 0;
+
+    const filteredProjects = projects.filter((p: any) => {
+        const q = searchTerm.toLowerCase();
+        const status = p.metrics?.status || "Not Started";
+        if (filter !== "all" && status !== filter) return false;
+        return !q || p.name?.toLowerCase().includes(q) || p.key?.toLowerCase().includes(q) || p.description?.toLowerCase().includes(q);
+    });
 
     return (
         <div className="space-y-8">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="page-title ">Project Portfolio</h1>
-                    <p className="text-muted-foreground mt-1 text-sm">Manage enterprise initiatives, tasks, and team collaborations.</p>
+            <PageHeader
+                eyebrow="Delivery · Projects"
+                title="Projects"
+                description="Every initiative, its progress and the people on it."
+                actions={canCreate && <Button onClick={() => setIsCreateOpen(true)}><Plus className="h-4 w-4" /> New project</Button>}
+            />
+
+            <StatGrid>
+                <Stat label="Projects" value={projects.length} icon={Briefcase} tone="signal" />
+                <Stat label="In progress" value={counts["In Progress"]} icon={Activity} hint={`${counts["Not Started"]} not started`} />
+                <Stat label="Completed" value={counts.Completed} icon={CheckCircle2} tone="ok" />
+                <Stat label="Average progress" value={`${avgProgress}%`} icon={ListChecks} hint={`${totalTasks} tasks in total`} progress={avgProgress} />
+            </StatGrid>
+
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex gap-1.5 overflow-x-auto">
+                    {(["all", "In Progress", "Not Started", "Completed"] as Filter[]).map(f => (
+                        <button
+                            key={f}
+                            onClick={() => setFilter(f)}
+                            className={cn(
+                                "shrink-0 rounded-full border px-3 py-1.5 text-sm transition-colors",
+                                filter === f ? "border-foreground bg-foreground text-background" : "text-muted-foreground hover:text-foreground"
+                            )}
+                        >
+                            {f === "all" ? "All" : f} <span className="ml-1 font-mono text-[11px] opacity-60">{counts[f]}</span>
+                        </button>
+                    ))}
                 </div>
-                <div className="flex items-center gap-3">
-                    <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Find projects..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="w-full md:w-64 pl-9 bg-muted/50 border-none shadow-none rounded-full focus-visible:ring-1"
-                        />
-                    </div>
-                    <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="rounded-full hover:shadow-primary/30 transition-all"><Plus className="mr-2 h-4 w-4" /> New Project</Button>
-                        </DialogTrigger>
-                        <DialogContent className="sm:max-w-[425px] border bg-background/95 ">
-                            <form onSubmit={handleCreateProject}>
-                                <DialogHeader>
-                                    <DialogTitle>Create Enterprise Project</DialogTitle>
-                                    <DialogDescription>
-                                        Initialize a new project environment. The key must be unique.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="grid gap-4 py-6">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="name">Project Name</Label>
-                                        <Input id="name" placeholder="e.g. Marketing Q1" value={newProject.name} onChange={(e) => setNewProject({ ...newProject, name: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="key">Project Key</Label>
-                                        <Input id="key" placeholder="e.g. MKT" className="uppercase font-mono" maxLength={10} value={newProject.key} onChange={(e) => setNewProject({ ...newProject, key: e.target.value })} />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="description">Description</Label>
-                                        <Textarea id="description" placeholder="Briefly describe the project goals..." value={newProject.description} onChange={(e) => setNewProject({ ...newProject, description: e.target.value })} />
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
-                                    <Button type="submit" disabled={isCreating}>
-                                        {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                        Initialize Project
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                <div className="relative w-full sm:w-72">
+                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input placeholder="Find a project…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                <AnimatePresence mode="popLayout">
-                    {isLoading ? (
-                        [1, 2, 3, 4].map(i => <motion.div key={i} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="h-64 rounded-2xl bg-muted/50 animate-pulse border border-dashed border-muted" />)
-                    ) : filteredProjects.length === 0 ? (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full">
-                            <Card className="py-16 border-dashed border text-center bg-muted/20 rounded-2xl">
-                                <CardContent className="space-y-4">
-                                    <div className="h-20 w-20 bg-muted rounded-full flex items-center justify-center mx-auto ">
-                                        <Briefcase className="h-10 w-10 text-muted-foreground/60" />
-                                    </div>
-                                    <div className="space-y-1">
-                                        <CardTitle className="text-xl">No projects found</CardTitle>
-                                        <CardDescription>Try adjusting your search or create a new initiative.</CardDescription>
-                                    </div>
-                                    <Button onClick={() => setIsCreateOpen(true)} className="rounded-full mt-4">Create Project</Button>
-                                </CardContent>
-                            </Card>
-                        </motion.div>
-                    ) : (
-                        filteredProjects.map((project: any, idx) => (
-                            <motion.div
-                                key={project.id}
-                                layout
-                                initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                animate={{ opacity: 1, scale: 1, y: 0 }}
-                                exit={{ opacity: 0, scale: 0.9 }}
-                                transition={{ delay: idx * 0.05, type: "spring", stiffness: 300, damping: 24 }}
-                            >
-                                <Card className="group h-full flex flex-col hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20 transition-all border overflow-hidden rounded-2xl cursor-pointer bg-card/50 relative ">
-                                    <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    <CardHeader className="pb-4 relative z-10 p-6">
-                                        <div className="flex items-start justify-between mb-4">
-                                            <div className="h-12 w-12 bg-primary text-primary-foreground rounded-2xl flex items-center justify-center font-semibold text-sm tracking-[0.12em] group-hover:scale-110 transition-transform">
-                                                {project.key}
+            {isLoading ? (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    {[0, 1, 2].map(i => <div key={i} className="h-64 animate-pulse rounded-2xl border bg-card" />)}
+                </div>
+            ) : filteredProjects.length === 0 ? (
+                <Panel>
+                    <EmptyState
+                        icon={Layers}
+                        title={projects.length === 0 ? "No projects yet" : "Nothing matches"}
+                        description={projects.length === 0 ? "Create a project to start tracking tasks against it." : "Try another search or filter."}
+                        action={projects.length === 0 && canCreate ? <Button onClick={() => setIsCreateOpen(true)}><Plus className="h-4 w-4" /> New project</Button> : undefined}
+                    />
+                </Panel>
+            ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                    <AnimatePresence mode="popLayout">
+                        {filteredProjects.map((project: any, idx) => {
+                            const progress = project.metrics?.progress || 0;
+                            const members: any[] = project.team?.members ?? [];
+                            return (
+                                <motion.div
+                                    key={project.id}
+                                    layout
+                                    initial={{ opacity: 0, y: 16 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, scale: 0.96 }}
+                                    transition={{ delay: Math.min(idx, 9) * 0.04, duration: 0.5, ease: EASE }}
+                                >
+                                    <Link
+                                        href={`/tasks?project=${project.id}`}
+                                        className="group relative flex h-full flex-col overflow-hidden rounded-2xl border bg-card outline-none transition-colors hover:border-signal/50 focus-visible:ring-2 focus-visible:ring-ring"
+                                    >
+                                        <div className="flex items-start justify-between p-6 pb-0">
+                                            <span className="rounded-md border px-2 py-1 font-mono text-xs font-medium tracking-wider">{project.key}</span>
+                                            <ArrowUpRight className="h-5 w-5 text-muted-foreground transition-all duration-300 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
+                                        </div>
+                                        <div className="flex-1 p-6">
+                                            <h3 className="line-clamp-1 text-xl font-semibold tracking-tight">{project.name}</h3>
+                                            <p className="mt-2 line-clamp-2 min-h-[40px] text-sm text-muted-foreground">{project.description || "No description."}</p>
+
+                                            <div className="mt-6 flex items-end justify-between">
+                                                <p className="text-4xl font-semibold tabular-nums tracking-tight">{progress}<span className="text-lg text-muted-foreground">%</span></p>
+                                                <p className="font-mono-label text-muted-foreground">{project.metrics?.taskCount || 0} tasks</p>
                                             </div>
-                                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all transform translate-x-4 group-hover:translate-x-0">
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background"><Star className="h-4 w-4" /></Button>
-                                                <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-background"><MoreVertical className="h-4 w-4" /></Button>
+                                            <div className="mt-3 h-1 overflow-hidden rounded-full bg-secondary">
+                                                <motion.div
+                                                    className={cn("h-full origin-left", project.metrics?.status === "Completed" ? "bg-emerald-500" : "bg-signal")}
+                                                    initial={{ scaleX: 0 }}
+                                                    whileInView={{ scaleX: progress / 100 }}
+                                                    viewport={{ once: true }}
+                                                    transition={{ duration: 1, ease: EASE }}
+                                                />
                                             </div>
                                         </div>
-                                        <CardTitle className="text-xl group-hover:text-primary transition-colors line-clamp-1">{project.name}</CardTitle>
-                                        <CardDescription className="line-clamp-2 mt-2 text-xs leading-relaxed min-h-[40px]">{project.description || "No description provided. Click to add details."}</CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="space-y-6 flex-1 px-6 pb-2">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center justify-between text-xs font-medium font-mono uppercase tracking-[0.12em]">
-                                                <span className={cn(project.metrics?.status === "Completed" ? "text-emerald-500" : "text-muted-foreground")}>Progress</span>
-                                                <span className={cn(project.metrics?.status === "Completed" ? "text-emerald-500" : "text-primary")}>{project.metrics?.progress || 0}%</span>
-                                            </div>
-                                            <Progress
-                                                value={project.metrics?.progress || 0}
-                                                className={cn("h-2 rounded-full", project.metrics?.status === "Completed" && "[&>div]:bg-emerald-500")}
-                                            />
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex -space-x-3">
-                                                {project.team?.members?.slice(0, 3).map((m: any) => (
-                                                    <Avatar key={m.id} className="h-8 w-8 border-2 border-background shadow-sm hover:z-10 hover:scale-110 transition-transform">
-                                                        <AvatarImage src={m.image} />
-                                                        <AvatarFallback className="text-[10px] bg-muted text-foreground font-bold">{m.name.substring(0, 2).toUpperCase()}</AvatarFallback>
-                                                    </Avatar>
-                                                ))}
-                                                {(!project.team?.members || project.team.members.length === 0) ? (
-                                                    <div className="h-8 w-8 rounded-full border border-dashed border-muted-foreground/30 flex items-center justify-center">
-                                                        <Users className="h-3 w-3 text-muted-foreground/50" />
-                                                    </div>
-                                                ) : (project.team.members.length > 3) && (
-                                                    <div className="h-8 w-8 rounded-full bg-background border-2 border-background flex items-center justify-center text-[10px] font-bold shadow-sm z-10">
-                                                        +{project.team.members.length - 3}
-                                                    </div>
+                                        <div className="flex items-center justify-between border-t px-6 py-4">
+                                            <div className="flex -space-x-2">
+                                                {members.slice(0, 4).map((m: any) => <PersonAvatar key={m.id} name={m.name} image={m.image} size="sm" className="ring-2 ring-card" />)}
+                                                {members.length > 4 && (
+                                                    <div className="flex h-8 w-8 items-center justify-center rounded-full border bg-secondary font-mono text-[10px] ring-2 ring-card">+{members.length - 4}</div>
                                                 )}
+                                                {members.length === 0 && <span className="text-xs text-muted-foreground">No team</span>}
                                             </div>
-                                            <div className="flex flex-col items-end gap-1 text-xs font-medium text-muted-foreground">
-                                                <span className="flex items-center gap-1.5 bg-muted/50 px-2 py-0.5 rounded-md"><Layout className="h-3 w-3" /> {project.metrics?.taskCount || 0} Tasks</span>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <StatusPill status={statusKey(project.metrics?.status)} label={project.metrics?.status || "Not started"} />
+                                                {project.updatedAt && <span className="text-[11px] text-muted-foreground">updated {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}</span>}
                                             </div>
                                         </div>
-                                    </CardContent>
-                                    <CardFooter className="bg-muted/20 p-4 border-t flex items-center justify-between text-[10px] font-medium font-mono uppercase tracking-[0.12em] mt-auto">
-                                        <div className={cn(
-                                            "flex items-center gap-2",
-                                            project.metrics?.status === "Completed" ? "text-emerald-600 dark:text-emerald-400" :
-                                                project.metrics?.status === "In Progress" ? "text-signal dark:text-signal" : "text-muted-foreground"
-                                        )}>
-                                            <div className={cn(
-                                                "h-2 w-2 rounded-full",
-                                                project.metrics?.status === "Completed" ? "bg-emerald-500" :
-                                                    project.metrics?.status === "In Progress" ? "bg-signal animate-pulse" : "bg-muted-foreground"
-                                            )} />
-                                            {project.metrics?.status || "Not Started"}
-                                        </div>
-                                        <div className="flex items-center gap-1.5 text-muted-foreground/70">
-                                            <Clock className="h-3 w-3" /> {format(new Date(project.updatedAt), "MMM d")}
-                                        </div>
-                                    </CardFooter>
-                                </Card>
-                            </motion.div>
-                        ))
-                    )}
-                </AnimatePresence>
-            </div>
+                                    </Link>
+                                </motion.div>
+                            );
+                        })}
+                    </AnimatePresence>
+                </div>
+            )}
+
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+                <DialogContent className="sm:max-w-[460px]">
+                    <form onSubmit={handleCreateProject}>
+                        <DialogHeader>
+                            <p className="font-mono-label text-muted-foreground">New project</p>
+                            <DialogTitle className="text-2xl">Start a project</DialogTitle>
+                            <DialogDescription>The key prefixes every task, e.g. MKT-12. It must be unique.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-6">
+                            <div className="space-y-2">
+                                <FieldLabel htmlFor="name">Name</FieldLabel>
+                                <Input
+                                    id="name"
+                                    placeholder="Marketing site relaunch"
+                                    value={newProject.name}
+                                    onChange={(e) => setNewProject(p => ({ ...p, name: e.target.value, key: keyTouched ? p.key : suggestKey(e.target.value) }))}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FieldLabel htmlFor="key">Key</FieldLabel>
+                                <Input
+                                    id="key"
+                                    placeholder="MKT"
+                                    className="font-mono uppercase"
+                                    maxLength={10}
+                                    value={newProject.key}
+                                    onChange={(e) => { setKeyTouched(true); setNewProject({ ...newProject, key: e.target.value.replace(/[^A-Za-z0-9]/g, "").toUpperCase() }); }}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <FieldLabel htmlFor="description">Description</FieldLabel>
+                                <Textarea id="description" placeholder="What does done look like?" value={newProject.description} onChange={(e) => setNewProject({ ...newProject, description: e.target.value })} />
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isCreating}>{isCreating && <Loader2 className="h-4 w-4 animate-spin" />} Create project</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

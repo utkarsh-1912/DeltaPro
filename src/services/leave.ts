@@ -1,7 +1,7 @@
 import { LeaveStatus, type LeaveRequest, type User } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { audit, notify, type Db } from "@/lib/activity";
-import { HttpError, assertCanApproveFor, isPeopleAdmin, type SessionUser } from "@/lib/api";
+import { HttpError, assertCanApproveFor, canActOnUser, isPeopleAdmin, type SessionUser } from "@/lib/api";
 import { emitEvent, scheduleDispatch } from "@/integrations/events";
 import { approversFor, person, toUtcDay, weekdaysBetween, ymd } from "./shared";
 
@@ -165,4 +165,11 @@ export async function decideLeave(actor: SessionUser, requestId: string, status:
 
     scheduleDispatch();
     return updated;
+}
+
+/** Balances for one person and year, created with defaults on first read. */
+export async function getBalances(actor: SessionUser, userId: string, year: number) {
+    if (userId !== actor.id && !(await canActOnUser(actor, userId))) throw new HttpError(403, "Forbidden");
+    await ensureBalances(userId, year);
+    return prisma.leaveBalance.findMany({ where: { userId, year }, orderBy: { type: "asc" } });
 }

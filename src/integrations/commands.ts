@@ -10,7 +10,7 @@ import type { CommandResult, DomainCommand } from "./types";
 async function actorByEmail(email: string): Promise<SessionUser> {
     const u = await prisma.user.findFirst({ where: { email: { equals: email, mode: "insensitive" }, isActive: true } });
     if (!u) throw new HttpError(403, `${email} has no active DeltaPro account.`);
-    return { id: u.id, role: u.role, email: u.email, name: u.name };
+    return { id: u.id, role: u.role, email: u.email, name: u.name, organizationId: u.organizationId ?? "" };
 }
 
 async function run(cmd: DomainCommand, integration: Integration): Promise<string> {
@@ -54,7 +54,7 @@ async function run(cmd: DomainCommand, integration: Integration): Promise<string
             const user = cmd.email
                 ? await prisma.user.findFirst({ where: { email: { equals: cmd.email, mode: "insensitive" } } })
                 : cmd.employeeId
-                    ? (await prisma.employeeProfile.findUnique({ where: { employeeId: cmd.employeeId }, include: { user: true } }))?.user ?? null
+                    ? (await prisma.employeeProfile.findFirst({ where: { employeeId: cmd.employeeId }, include: { user: true } }))?.user ?? null
                     : null;
             if (!user) throw new HttpError(404, `No employee for ${cmd.email ?? cmd.employeeId}.`);
             const r = await recordPunch(user.id, new Date(cmd.timestamp), cmd.direction, cmd.deviceId, origin);

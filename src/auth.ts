@@ -6,10 +6,12 @@ import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import { Role } from "@prisma/client"
 import { z } from "zod"
-import { prisma } from "@/lib/prisma"
+import { rootPrisma as prisma } from "@/lib/prisma"
 import { authConfig } from "./auth.config"
 import { verifyPassword, isAllowedDomain, isBootstrapAdmin } from "@/lib/password"
 import { linkTeamMembersToUser } from "@/lib/people"
+import { getOrganization, resolveOrganizationForSignup } from "@/services/organizations"
+import { runWithTenant } from "@/server/context"
 
 const credentialsSchema = z.object({
     email: z.string().email().transform(e => e.toLowerCase().trim()),
@@ -72,14 +74,20 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             const refreshedAt = (token as any).refreshedAt as number | undefined;
             if (params.user || params.trigger === "update" || !refreshedAt || Date.now() - refreshedAt > ROLE_REFRESH_MS) {
                 if (!token.id) return null;
-                let dbUser = await prisma.user.findUnique({ where: { id: token.id as string }, select: { role: true, isActive: true, email: true } });
+                const select = { role: true, isActive: true, email: true, organizationId: true } as const;
+                let dbUser = await prisma.user.findUnique({ where: { id: token.id as string }, select });
                 if (!dbUser || !dbUser.isActive) return null;
                 // Existing accounts listed in AUTH_ADMIN_EMAILS are promoted on their next sign-in.
                 if (dbUser.role !== Role.ADMIN && isBootstrapAdmin(dbUser.email)) {
-                    dbUser = await prisma.user.update({ where: { id: token.id as string }, data: { role: Role.ADMIN }, select: { role: true, isActive: true, email: true } });
+                    dbUser = await prisma.user.update({ where: { id: token.id as string }, data: { role: Role.ADMIN }, select });
                 }
+                const org = dbUser.organizationId ? await getOrganization(dbUser.organizationId) : null;
                 token.role = dbUser.role;
-                (token as any).refreshedAt = Date.now();
+                const t = token as any;
+                t.organizationId = dbUser.organizationId;
+                t.orgName = org?.name ?? null;
+                t.plan = org?.plan ?? null;
+                t.refreshedAt = Date.now();
             }
             return token;
         },
@@ -87,11 +95,14 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     events: {
         // Fires for users created by an SSO provider through the Prisma adapter.
         async createUser({ user }) {
-            if (!user.id) return;
-            if (isBootstrapAdmin(user.email)) {
-                await prisma.user.update({ where: { id: user.id }, data: { role: Role.ADMIN } });
-            }
-            await linkTeamMembersToUser(user.id, user.email);
+            if (!user.id || !user.email) return;
+            // SSO sign-up: join the organization that owns this email domain, or start a new one.
+            const { organization, role } = await resolveOrganizationForSignup(user.email);
+            await prisma.user.update({
+                where: { id: user.id },
+                data: { organizationId: organization.id, role: isBootstrapAdmin(user.email) ? Role.ADMIN : role },
+            });
+            await runWithTenant(organization.id, () => linkTeamMembersToUser(user.id!, user.email));
         },
     },
 })

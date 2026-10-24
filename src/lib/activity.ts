@@ -1,7 +1,7 @@
-import { Prisma, PrismaClient } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
+import { prisma, type Db } from "@/lib/prisma";
 
-export type Db = PrismaClient | Prisma.TransactionClient;
+export type { Db };
 
 export type NotificationType = "success" | "alert" | "task" | "info";
 

@@ -1,25 +1,26 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import {
-    Clock, MapPin, Calendar as CalendarIcon, CheckCircle2, History, Timer,
-    ArrowUpRight, ArrowDownLeft, Loader2, Home, Building2, ShieldCheck,
-    AlertTriangle, Filter, ClipboardList, CheckSquare, XCircle, Users
+    MapPin, Calendar as CalendarIcon, History, Timer, ArrowUpRight, ArrowDownLeft, Loader2,
+    Home, Building2, ShieldCheck, AlertTriangle, ClipboardList, Users, Download, Check, X, Gauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { format, startOfDay, endOfDay } from "date-fns";
+import { format, startOfDay, endOfDay, isToday, differenceInMinutes } from "date-fns";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useSession } from "next-auth/react";
-import { Role } from "@prisma/client";
+import { PageHeader, StatGrid, Stat, Panel, EmptyState, StatusPill, FieldLabel, Segmented, PersonAvatar, downloadCsv } from "@/components/page";
+import { EASE } from "@/components/motion";
+
+const DAILY_TARGET_MINUTES = 480;
+const fmtMinutes = (m: number) => `${Math.floor(m / 60)}h ${String(Math.round(m % 60)).padStart(2, "0")}m`;
 
 export default function AttendancePage() {
     const { data: session } = useSession();
@@ -38,6 +39,9 @@ export default function AttendancePage() {
     const [requests, setRequests] = useState<any[]>([]);
     const [teamLogs, setTeamLogs] = useState<any[]>([]);
     const [approvalsPending, setApprovalsPending] = useState<any[]>([]);
+    const [deciding, setDeciding] = useState<string | null>(null);
+    const [tab, setTab] = useState("my-attendance");
+    const [, setTick] = useState(0);
 
     const watchId = useRef<number | null>(null);
 
@@ -73,7 +77,6 @@ export default function AttendancePage() {
                 }
             }
 
-            // Fetch requests
             const reqRes = await fetch("/api/attendance/requests");
             if (reqRes.ok) {
                 const reqData = await reqRes.json();
@@ -90,7 +93,6 @@ export default function AttendancePage() {
                     setTeamLogs(teamData.logs);
                 }
             }
-
         } catch (error) {
             console.error(error);
         } finally {
@@ -115,6 +117,7 @@ export default function AttendancePage() {
                 setElapsedTime(
                     `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`
                 );
+                setTick(t => t + 1);
             }, 1000);
         } else {
             setElapsedTime("00:00:00");
@@ -236,435 +239,409 @@ export default function AttendancePage() {
         }
     };
 
+    const decideRequest = async (id: string, status: "APPROVED" | "REJECTED") => {
+        setDeciding(id);
+        try {
+            const res = await fetch("/api/attendance/requests", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id, status }),
+            });
+            if (res.ok) {
+                toast({ title: status === "APPROVED" ? "Request approved" : "Request rejected" });
+                fetchData(selectedDate);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                toast({ title: "Could not update request", description: err.error || "Try again.", variant: "destructive" });
+            }
+        } finally {
+            setDeciding(null);
+        }
+    };
+
+    // Derived figures (computed from real logs, not placeholders)
+    const dayMinutes = logs.reduce((sum, l) => {
+        const end = l.logoutTime ? new Date(l.logoutTime) : new Date();
+        return sum + Math.max(0, differenceInMinutes(end, new Date(l.loginTime)));
+    }, 0);
+    const remainingMinutes = Math.max(0, DAILY_TARGET_MINUTES - dayMinutes);
+    const dayProgress = Math.min(1, dayMinutes / DAILY_TARGET_MINUTES);
+    const firstEntry = logs.length ? new Date(Math.min(...logs.map(l => new Date(l.loginTime).getTime()))) : null;
+
+    const presence = useMemo(() => {
+        const people = new Map<string, any>();
+        for (const l of teamLogs) {
+            const key = l.userId ?? l.user?.name;
+            const prev = people.get(key);
+            if (!prev || new Date(l.loginTime) > new Date(prev.loginTime)) people.set(key, l);
+        }
+        const latest = Array.from(people.values());
+        const online = latest.filter(l => !l.logoutTime);
+        return { total: latest.length, online: online.length, remote: online.filter(l => l.isWfh).length };
+    }, [teamLogs]);
+
+    const officeLabel = settings?.officeName || settings?.officeAddress || "Office geofence";
+
+    const exportTeamCsv = () => downloadCsv(`attendance-${format(new Date(), "yyyy-MM-dd")}.csv`, teamLogs.map(l => ({
+        name: l.user?.name ?? "",
+        role: l.user?.role ?? "",
+        mode: l.isWfh ? "WFH" : "Office",
+        login: format(new Date(l.loginTime), "yyyy-MM-dd HH:mm"),
+        logout: l.logoutTime ? format(new Date(l.logoutTime), "yyyy-MM-dd HH:mm") : "",
+        minutes: differenceInMinutes(l.logoutTime ? new Date(l.logoutTime) : new Date(), new Date(l.loginTime)),
+    })));
+
+    const R = 104;
+    const C = 2 * Math.PI * R;
+
     return (
-        <div className="max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-700">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
-                    <h1 className="page-title ">Attendance Hub</h1>
-                    <p className="text-muted-foreground mt-2 text-lg">Centralize your time tracking, geofencing, and shift management.</p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                    {/* WFH Toggle */}
-                    <div className="bg-muted/50 p-1.5 rounded-2xl flex items-center gap-1 border border-border/40">
-                        <Button
-                            variant={!isWfh ? "default" : "ghost"}
-                            size="sm"
-                            className="rounded-xl px-4 font-bold"
-                            onClick={() => !isClockedIn && setIsWfh(false)}
+        <div className="mx-auto max-w-[1600px] space-y-8">
+            <PageHeader
+                eyebrow={<>Workforce · Attendance · {format(selectedDate, "EEEE, d MMMM")}</>}
+                title="Attendance"
+                description="Clock in and out, track your hours against target, and request corrections."
+                actions={
+                    <>
+                        <Segmented
+                            value={isWfh ? "remote" : "office"}
+                            onChange={(v) => !isClockedIn && setIsWfh(v === "remote")}
                             disabled={isClockedIn}
-                        >
-                            <Building2 className="h-4 w-4 mr-2" /> Office
-                        </Button>
-                        <Button
-                            variant={isWfh ? "default" : "ghost"}
-                            size="sm"
-                            className="rounded-xl px-4 font-bold"
-                            onClick={() => !isClockedIn && setIsWfh(true)}
-                            disabled={isClockedIn}
-                        >
-                            <Home className="h-4 w-4 mr-2" /> Remote
-                        </Button>
-                    </div>
+                            options={[{ value: "office", label: "Office", icon: Building2 }, { value: "remote", label: "Remote", icon: Home }]}
+                        />
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="outline" className="gap-2">
+                                    <CalendarIcon className="h-4 w-4 text-signal" />
+                                    {isToday(selectedDate) ? "Today" : format(selectedDate, "EEE, MMM d")}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-2" align="end">
+                                <input
+                                    type="date"
+                                    className="rounded-lg bg-transparent p-2 outline-none"
+                                    value={format(selectedDate, "yyyy-MM-dd")}
+                                    onChange={(e) => e.target.value && setSelectedDate(new Date(e.target.value))}
+                                />
+                            </PopoverContent>
+                        </Popover>
+                    </>
+                }
+            />
 
-                    <Popover>
-                        <PopoverTrigger asChild>
-                            <Button variant="outline" className="h-12 px-5 rounded-2xl border-primary/20 bg-background/50 flex items-center gap-3 hover:bg-primary/5 transition-all shadow-sm">
-                                <CalendarIcon className="h-5 w-5 text-primary" />
-                                <span className="font-bold">{format(selectedDate, "EEE, MMM do")}</span>
-                            </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 rounded-2xl border" align="end">
-                            <input
-                                type="date"
-                                className="p-4 bg-background rounded-2xl outline-none"
-                                value={format(selectedDate, "yyyy-MM-dd")}
-                                onChange={(e) => setSelectedDate(new Date(e.target.value))}
-                            />
-                        </PopoverContent>
-                    </Popover>
-                </div>
-            </div>
-
-            <Tabs defaultValue="my-attendance" className="w-full">
-                <TabsList className="bg-muted/30 p-1 rounded-2xl mb-8 border border-border/40 inline-flex">
-                    <TabsTrigger value="my-attendance" className="rounded-xl px-8 font-bold data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all">My Attendance</TabsTrigger>
-                    <TabsTrigger value="regularization" className="rounded-xl px-8 font-bold data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all">Requests</TabsTrigger>
+            <Tabs value={tab} onValueChange={setTab} className="w-full">
+                <TabsList className="mb-8">
+                    <TabsTrigger value="my-attendance">My attendance</TabsTrigger>
+                    <TabsTrigger value="regularization">Corrections</TabsTrigger>
                     {isPrivileged && (
-                        <TabsTrigger value="manager" className="rounded-xl px-8 font-bold data-[state=active]:bg-background data-[state=active]:shadow-lg transition-all flex items-center gap-2">
-                            Manager Portal
-                            {approvalsPending.length > 0 && <Badge className="bg-rose-500 hover:bg-rose-500 h-5 px-1.5">{approvalsPending.length}</Badge>}
+                        <TabsTrigger value="manager" className="gap-2">
+                            Team
+                            {approvalsPending.length > 0 && (
+                                <span className="rounded bg-destructive px-1.5 font-mono text-[10px] text-destructive-foreground">{approvalsPending.length}</span>
+                            )}
                         </TabsTrigger>
                     )}
                 </TabsList>
 
                 <TabsContent value="my-attendance" className="space-y-8 focus-visible:outline-none">
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                        {/* LEFT: Clock Section */}
-                        <div className="lg:col-span-4 space-y-6">
-                            <Card className="overflow-hidden border bg-card relative group">
-                                <div className={cn(
-                                    "absolute top-0 right-0 h-32 w-32 -mr-8 -mt-8 rounded-full blur-3xl opacity-20 transition-colors duration-1000",
-                                    isClockedIn ? "bg-emerald-500" : "bg-primary"
-                                )} />
-
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Clock className="h-5 w-5" /> Clock Terminal
-                                    </CardTitle>
-                                </CardHeader>
-
-                                <CardContent className="flex flex-col items-center py-12 space-y-8">
-                                    <div className="text-center">
-                                        <div className="text-7xl font-mono font-semibold tracking-tight text-foreground tabular-nums">
-                                            {elapsedTime}
-                                        </div>
-                                        <p className="font-mono-label text-muted-foreground mt-3">Session Elapsed</p>
-                                    </div>
-
-                                    <div className="relative">
-                                        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                                            <Button
-                                                onClick={handleClockToggle}
-                                                disabled={isActionLoading}
-                                                className={cn(
-                                                    "h-56 w-56 rounded-full text-3xl font-semibold border-[10px] transition-all duration-700 relative z-10",
-                                                    isClockedIn
-                                                        ? "bg-rose-600 hover:bg-rose-600/90 border-rose-500/20"
-                                                        : "bg-primary hover:bg-primary/90 border-secondary"
-                                                )}
-                                            >
-                                                {isActionLoading ? <Loader2 className="h-10 w-10 animate-spin" /> : (isClockedIn ? "OUT" : "IN")}
-                                            </Button>
-                                        </motion.div>
-                                        {isClockedIn && (
-                                            <div className="absolute inset-0 rounded-full bg-emerald-500/20 animate-ping" />
-                                        )}
-                                    </div>
-
-                                    <div className="flex flex-col items-center gap-3">
-                                        {isWfh ? (
-                                            <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 px-4 py-1.5 rounded-full flex items-center gap-2">
-                                                <Home className="h-3 w-3" /> WFH Mode Active
-                                            </Badge>
-                                        ) : (
-                                            <div className={cn(
-                                                "flex items-center gap-2 px-4 py-1.5 rounded-full border transition-all font-bold text-xs uppercase tracking-wider",
-                                                geoStatus === "valid" ? "bg-emerald-500/10 text-emerald-600 border-emerald-200" :
-                                                    geoStatus === "invalid" ? "bg-rose-500/10 text-rose-600 border-rose-200" :
-                                                        "bg-amber-500/10 text-amber-600 border-amber-200"
-                                            )}>
-                                                {geoStatus === "valid" ? <ShieldCheck className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
-                                                {geoStatus === "valid" ? "Inside Geofence" : geoStatus === "invalid" ? "Outside Range" : "Validating Location..."}
-                                            </div>
-                                        )}
-                                        <p className="text-xs text-muted-foreground flex items-center gap-1 font-medium italic">
-                                            <MapPin className="h-3 w-3" /> Mumbai, Corporate HQ
-                                        </p>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <Card className="p-4 bg-muted/20 border-none">
-                                    <p className="text-[10px] font-medium text-muted-foreground uppercase opacity-50 tracking-[0.12em] font-mono">Entry</p>
-                                    <p className="text-xl font-bold mt-1 tabular-nums">{startTime ? format(startTime, "HH:mm") : '--:--'}</p>
-                                </Card>
-                                <Card className="p-4 bg-muted/20 border-none">
-                                    <p className="text-[10px] font-medium text-muted-foreground uppercase opacity-50 tracking-[0.12em] font-mono">Target Remaining</p>
-                                    <p className="text-xl font-bold mt-1 tabular-nums">7h 42m</p>
-                                </Card>
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-12">
+                        {/* Clock terminal */}
+                        <section className="relative overflow-hidden rounded-2xl border bg-card lg:col-span-5 xl:col-span-4">
+                            <div className="dotgrid absolute inset-0 opacity-50 [mask-image:radial-gradient(circle_at_50%_45%,#000,transparent_70%)]" />
+                            <div className="relative flex items-center justify-between border-b px-6 py-4">
+                                <p className="font-mono-label text-muted-foreground">Clock terminal</p>
+                                <StatusPill status={isClockedIn ? "ONLINE" : "OFFLINE"} label={isClockedIn ? (isWfh ? "On · remote" : "On · office") : "Off"} />
                             </div>
-                        </div>
+                            <div className="relative flex flex-col items-center px-6 py-10">
+                                <div className="relative h-[240px] w-[240px]">
+                                    <svg viewBox="0 0 240 240" className="absolute inset-0 -rotate-90">
+                                        <circle cx="120" cy="120" r={R} fill="none" stroke="hsl(var(--border))" strokeWidth="6" />
+                                        <motion.circle
+                                            cx="120" cy="120" r={R} fill="none" stroke="hsl(var(--signal))" strokeWidth="6" strokeLinecap="round"
+                                            strokeDasharray={C}
+                                            initial={{ strokeDashoffset: C }}
+                                            animate={{ strokeDashoffset: C * (1 - dayProgress) }}
+                                            transition={{ duration: 1.2, ease: EASE }}
+                                        />
+                                    </svg>
+                                    <motion.button
+                                        whileHover={{ scale: 1.03 }}
+                                        whileTap={{ scale: 0.97 }}
+                                        onClick={handleClockToggle}
+                                        disabled={isActionLoading || isLoading}
+                                        className={cn(
+                                            "absolute inset-[22px] flex flex-col items-center justify-center rounded-full text-primary-foreground transition-colors disabled:opacity-70",
+                                            isClockedIn ? "bg-destructive text-destructive-foreground" : "bg-primary"
+                                        )}
+                                    >
+                                        {isActionLoading ? <Loader2 className="h-8 w-8 animate-spin" /> : (
+                                            <>
+                                                <span className="font-mono-label opacity-70">{isClockedIn ? "Tap to" : "Tap to"}</span>
+                                                <span className="mt-1 text-3xl font-semibold tracking-tight">{isClockedIn ? "Clock out" : "Clock in"}</span>
+                                            </>
+                                        )}
+                                    </motion.button>
+                                    {isClockedIn && <span className="pointer-events-none absolute inset-[22px] animate-ping rounded-full bg-destructive/15" />}
+                                </div>
 
-                        {/* RIGHT: Dashboard metrics */}
-                        <div className="lg:col-span-8 space-y-8">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                <Card className="border bg-primary text-primary-foreground relative overflow-hidden h-40 flex items-center">
-                                    <div className="absolute right-0 bottom-0 opacity-10 -mr-6 -mb-6">
-                                        <Timer className="h-32 w-32" />
-                                    </div>
-                                    <CardContent className="pt-6">
-                                        <p className="text-sm font-medium opacity-80 font-mono uppercase tracking-[0.12em]">Weekly Total</p>
-                                        <h3 className="text-4xl font-semibold mt-2 tabular-nums">{metrics?.weeklyTotal || "0h 0m"}</h3>
-                                        <div className="flex items-center gap-3 mt-4">
-                                            <div className="h-1.5 flex-1 bg-white/20 rounded-full overflow-hidden">
-                                                <div className="h-full bg-white transition-all duration-1000" style={{ width: `${metrics?.targetPercentage || 0}%` }} />
-                                            </div>
-                                            <span className="text-xs font-semibold">{metrics?.targetPercentage || 0}%</span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
+                                <p className="mt-8 font-mono text-5xl font-medium tabular-nums tracking-tight">{elapsedTime}</p>
+                                <p className="font-mono-label mt-2 text-muted-foreground">Current session</p>
 
-                                <Card className="border bg-[hsl(228_45%_8%)] text-white relative overflow-hidden h-40 flex items-center">
-                                    <div className="absolute right-0 bottom-0 opacity-10 -mr-6 -mb-6">
-                                        <CheckCircle2 className="h-32 w-32" />
-                                    </div>
-                                    <CardContent className="pt-6">
-                                        <p className="text-sm font-medium opacity-80 font-mono uppercase tracking-[0.12em]">Attendance Score</p>
-                                        <h3 className="text-4xl font-semibold mt-2">{metrics?.attendanceScore || "0%"}</h3>
-                                        <p className="text-xs font-bold mt-4 opacity-80">Excellent performance!</p>
-                                    </CardContent>
-                                </Card>
-
-                                <Card className="border bg-muted/50 dark:bg-muted/10 relative overflow-hidden h-40 flex items-center">
-                                    <div className="absolute right-0 bottom-0 opacity-10 -mr-6 -mb-6">
-                                        <History className="h-32 w-32" />
-                                    </div>
-                                    <CardContent className="pt-6">
-                                        <p className="text-sm font-medium text-muted-foreground font-mono uppercase tracking-[0.12em]">Total Days logged</p>
-                                        <h3 className="text-4xl font-semibold mt-2">{logs.filter(l => !!l.logoutTime).length}</h3>
-                                        <p className="text-xs font-bold text-muted-foreground mt-4 italic">Updated 1m ago</p>
-                                    </CardContent>
-                                </Card>
+                                <div className="mt-6 flex flex-col items-center gap-2">
+                                    {isWfh ? (
+                                        <StatusPill status="IN_PROGRESS" label="Remote mode" />
+                                    ) : (
+                                        <span className={cn(
+                                            "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 font-mono text-[11px] uppercase tracking-wider ring-1 ring-inset",
+                                            geoStatus === "valid" ? "bg-emerald-500/10 text-emerald-700 ring-emerald-500/20 dark:text-emerald-400" :
+                                                geoStatus === "invalid" ? "bg-destructive/10 text-destructive ring-destructive/20" :
+                                                    "bg-amber-500/10 text-amber-700 ring-amber-500/20 dark:text-amber-400"
+                                        )}>
+                                            {geoStatus === "valid" ? <ShieldCheck className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                                            {geoStatus === "valid" ? "Inside geofence" : geoStatus === "invalid" ? "Outside range" : geoStatus === "error" ? "Location unavailable" : "Checking location"}
+                                        </span>
+                                    )}
+                                    {!isWfh && (
+                                        <p className="flex items-center gap-1 text-xs text-muted-foreground"><MapPin className="h-3 w-3" /> {officeLabel}</p>
+                                    )}
+                                </div>
                             </div>
+                            <div className="relative grid grid-cols-2 divide-x border-t">
+                                <div className="p-5">
+                                    <p className="font-mono-label text-muted-foreground">First entry</p>
+                                    <p className="mt-1 text-xl font-semibold tabular-nums">{firstEntry ? format(firstEntry, "HH:mm") : "--:--"}</p>
+                                </div>
+                                <div className="p-5">
+                                    <p className="font-mono-label text-muted-foreground">Left to target</p>
+                                    <p className="mt-1 text-xl font-semibold tabular-nums">{remainingMinutes === 0 ? "Done" : fmtMinutes(remainingMinutes)}</p>
+                                </div>
+                            </div>
+                        </section>
 
-                            <Card className="border bg-background/50 overflow-hidden">
-                                <CardHeader className="flex flex-row items-center justify-between border-b border-border/40 pb-6">
-                                    <div>
-                                        <CardTitle className="flex items-center gap-2"><History className="h-5 w-5 text-primary" /> Recent History</CardTitle>
-                                        <CardDescription>Daily clock-in/out records</CardDescription>
-                                    </div>
-                                    <Button variant="outline" size="sm" className="rounded-xl font-bold"><Filter className="h-3 w-3 mr-2" /> Filter Logs</Button>
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <ScrollArea className="h-[450px]">
-                                        {logs.length > 0 ? (
-                                            <div className="divide-y divide-border/40">
-                                                {logs.map((log, i) => (
-                                                    <div key={log.id} className="p-6 flex items-center justify-between hover:bg-muted/30 transition-all group">
-                                                        <div className="flex items-center gap-5">
-                                                            <div className={cn(
-                                                                "h-12 w-12 rounded-2xl flex items-center justify-center transition-transform group-hover:scale-110",
-                                                                log.logoutTime ? "bg-rose-500/10 text-rose-600" : "bg-emerald-500/10 text-emerald-600"
-                                                            )}>
-                                                                {log.logoutTime ? <ArrowUpRight className="h-6 w-6" /> : <ArrowDownLeft className="h-6 w-6" />}
-                                                            </div>
-                                                            <div>
-                                                                <div className="flex items-center gap-3">
-                                                                    <p className="text-base font-bold text-foreground">Clock {log.logoutTime ? 'Out' : 'In'}</p>
-                                                                    {log.isWfh && <Badge variant="outline" className="text-[9px] font-semibold tracking-tight uppercase h-4 bg-primary/5 text-primary border-primary/20 font-mono">Remote</Badge>}
-                                                                </div>
-                                                                <p className="text-xs text-muted-foreground font-medium flex items-center gap-1.5 mt-1 opacity-70">
-                                                                    <MapPin className="h-3 w-3" /> {log.loginLocation || 'Standard Entry'}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-lg font-mono font-semibold tabular-nums">{format(new Date(log.logoutTime || log.loginTime), "HH:mm:ss")}</p>
-                                                            <p className="text-[10px] font-medium text-muted-foreground font-mono uppercase tracking-[0.12em] mt-1 opacity-50">{format(new Date(log.loginTime), "MMM d, yyyy")}</p>
-                                                        </div>
+                        {/* Metrics + history */}
+                        <div className="space-y-8 lg:col-span-7 xl:col-span-8">
+                            <StatGrid>
+                                <Stat label="This week" value={metrics?.weeklyTotal || "0h 00m"} icon={Timer} tone="signal" hint={`${metrics?.targetPercentage || 0}% of 40h target`} progress={metrics?.targetPercentage || 0} />
+                                <Stat label="Attendance score" value={metrics?.attendanceScore || "0%"} icon={Gauge} hint="Days present this week" />
+                                <Stat label={isToday(selectedDate) ? "Today" : "That day"} value={fmtMinutes(dayMinutes)} icon={History} hint={`${logs.length} session${logs.length === 1 ? "" : "s"}`} progress={dayProgress * 100} />
+                            </StatGrid>
+
+                            <Panel
+                                title="Activity"
+                                description={`Sessions on ${format(selectedDate, "MMMM d, yyyy")}`}
+                                bodyClassName="p-0"
+                            >
+                                <ScrollArea className="h-[420px]">
+                                    {isLoading ? (
+                                        <div className="space-y-px">{[0, 1, 2].map(i => <div key={i} className="h-[72px] animate-pulse bg-secondary/40" />)}</div>
+                                    ) : logs.length > 0 ? (
+                                        <ol className="relative">
+                                            {logs.map((log, i) => (
+                                                <motion.li
+                                                    key={log.id}
+                                                    initial={{ opacity: 0, y: 8 }}
+                                                    animate={{ opacity: 1, y: 0 }}
+                                                    transition={{ delay: i * 0.04, ease: EASE }}
+                                                    className="grid grid-cols-[auto_1fr_auto] items-center gap-4 border-b px-6 py-4 last:border-0 hover:bg-secondary/40"
+                                                >
+                                                    <div className={cn(
+                                                        "flex h-10 w-10 items-center justify-center rounded-lg border",
+                                                        log.logoutTime ? "text-muted-foreground" : "border-signal/40 text-signal"
+                                                    )}>
+                                                        {log.logoutTime ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownLeft className="h-4 w-4" />}
                                                     </div>
-                                                ))}
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-col items-center justify-center h-[300px] text-muted-foreground opacity-40 italic">
-                                                <ClipboardList className="h-12 w-12 mb-2" />
-                                                <p>No activity recorded yet.</p>
-                                            </div>
-                                        )}
-                                    </ScrollArea>
-                                </CardContent>
-                            </Card>
+                                                    <div className="min-w-0">
+                                                        <div className="flex items-center gap-2">
+                                                            <p className="font-medium">
+                                                                {format(new Date(log.loginTime), "HH:mm")} – {log.logoutTime ? format(new Date(log.logoutTime), "HH:mm") : "now"}
+                                                            </p>
+                                                            {log.isWfh && <StatusPill status="IN_PROGRESS" label="Remote" />}
+                                                            {!log.logoutTime && <StatusPill status="ONLINE" label="Active" />}
+                                                        </div>
+                                                        <p className="mt-0.5 flex items-center gap-1 truncate text-xs text-muted-foreground">
+                                                            <MapPin className="h-3 w-3 shrink-0" /> {log.loginLocation || "Standard entry"}
+                                                        </p>
+                                                    </div>
+                                                    <p className="font-mono text-sm tabular-nums text-muted-foreground">
+                                                        {fmtMinutes(Math.max(0, differenceInMinutes(log.logoutTime ? new Date(log.logoutTime) : new Date(), new Date(log.loginTime))))}
+                                                    </p>
+                                                </motion.li>
+                                            ))}
+                                        </ol>
+                                    ) : (
+                                        <EmptyState icon={ClipboardList} title="No sessions" description="Nothing was recorded on this day." />
+                                    )}
+                                </ScrollArea>
+                            </Panel>
                         </div>
                     </div>
                 </TabsContent>
 
-                <TabsContent value="regularization" className="space-y-6 focus-visible:outline-none">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div className="lg:col-span-1 space-y-6">
-                            <Card className="border bg-background/80 ">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2"><CheckSquare className="h-5 w-5 text-primary" /> New Request</CardTitle>
-                                    <CardDescription>Submit attendance corrections for missing logs.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <form className="space-y-5" onSubmit={async (e: React.FormEvent<HTMLFormElement>) => {
-                                        e.preventDefault();
-                                        const formData = new FormData(e.currentTarget);
-                                        setIsActionLoading(true);
-                                        try {
-                                            const res = await fetch("/api/attendance/requests", {
-                                                method: "POST",
-                                                body: JSON.stringify({
-                                                    type: formData.get("type"),
-                                                    date: formData.get("date"),
-                                                    reason: formData.get("reason"),
-                                                })
-                                            });
-                                            if (res.ok) {
-                                                toast({ title: "Request Submitted", description: "Your regularization request is pending approval." });
-                                                fetchData(selectedDate);
-                                            }
-                                        } catch (e) {
-                                            toast({ title: "Error", description: "Failed to submit request.", variant: "destructive" });
-                                        } finally {
-                                            setIsActionLoading(false);
-                                        }
-                                    }}>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-medium font-mono uppercase tracking-[0.12em] text-muted-foreground">Type</label>
-                                            <select
-                                                name="type"
-                                                className="w-full h-11 bg-muted/40 border-none rounded-xl px-4 text-sm font-medium focus:ring-2 ring-primary"
-                                            >
-                                                <option value="FULL_DAY">Full Day Regularization</option>
-                                                <option value="CLOCK_IN">Missing Clock In</option>
-                                                <option value="CLOCK_OUT">Missing Clock Out</option>
-                                            </select>
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-medium font-mono uppercase tracking-[0.12em] text-muted-foreground">Date</label>
-                                            <Input name="date" type="date" className="h-11 bg-muted/40 border-none rounded-xl font-medium" required />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <label className="text-xs font-medium font-mono uppercase tracking-[0.12em] text-muted-foreground">Reason</label>
-                                            <Textarea name="reason" placeholder="Why was the clock-in missed?" className="bg-muted/40 border-none rounded-xl font-medium resize-none min-h-[100px]" required />
-                                        </div>
-                                        <Button type="submit" disabled={isActionLoading} className="w-full h-12 rounded-2xl font-semibold text-base ">Submit Request</Button>
-                                    </form>
-                                </CardContent>
-                            </Card>
-                        </div>
+                <TabsContent value="regularization" className="focus-visible:outline-none">
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                        <Panel title="Request a correction" description="For a missed clock-in, clock-out or whole day." className="h-fit">
+                            <form className="space-y-5 p-6" onSubmit={async (e: React.FormEvent<HTMLFormElement>) => {
+                                e.preventDefault();
+                                const form = e.currentTarget;
+                                const formData = new FormData(form);
+                                setIsActionLoading(true);
+                                try {
+                                    const res = await fetch("/api/attendance/requests", {
+                                        method: "POST",
+                                        body: JSON.stringify({
+                                            type: formData.get("type"),
+                                            date: formData.get("date"),
+                                            reason: formData.get("reason"),
+                                        })
+                                    });
+                                    if (res.ok) {
+                                        toast({ title: "Request submitted", description: "Your correction is pending approval." });
+                                        form.reset();
+                                        fetchData(selectedDate);
+                                    } else {
+                                        const err = await res.json().catch(() => ({}));
+                                        toast({ title: "Could not submit", description: err.error || "Check the form and try again.", variant: "destructive" });
+                                    }
+                                } catch (e) {
+                                    toast({ title: "Error", description: "Failed to submit request.", variant: "destructive" });
+                                } finally {
+                                    setIsActionLoading(false);
+                                }
+                            }}>
+                                <div className="space-y-2">
+                                    <FieldLabel htmlFor="reg-type">Type</FieldLabel>
+                                    <select id="reg-type" name="type" className="h-10 w-full rounded-lg border bg-card px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                                        <option value="FULL_DAY">Full day</option>
+                                        <option value="CLOCK_IN">Missing clock-in</option>
+                                        <option value="CLOCK_OUT">Missing clock-out</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-2">
+                                    <FieldLabel htmlFor="reg-date">Date</FieldLabel>
+                                    <Input id="reg-date" name="date" type="date" max={format(new Date(), "yyyy-MM-dd")} required />
+                                </div>
+                                <div className="space-y-2">
+                                    <FieldLabel htmlFor="reg-reason">Reason</FieldLabel>
+                                    <Textarea id="reg-reason" name="reason" placeholder="What happened?" className="min-h-[100px] resize-none" required minLength={3} />
+                                </div>
+                                <Button type="submit" disabled={isActionLoading} className="w-full">
+                                    {isActionLoading && <Loader2 className="h-4 w-4 animate-spin" />} Submit request
+                                </Button>
+                            </form>
+                        </Panel>
 
-                        <div className="lg:col-span-2">
-                            <Card className="border bg-background/80 h-full">
-                                <CardHeader>
-                                    <CardTitle>My Past Requests</CardTitle>
-                                    <CardDescription>Status tracking for your regularization submissions.</CardDescription>
-                                </CardHeader>
-                                <CardContent className="p-0 border-t">
-                                    <div className="divide-y">
-                                        {requests.length > 0 ? requests.map((req, i) => (
-                                            <div key={i} className="p-6 flex items-center justify-between group hover:bg-muted/20">
-                                                <div className="flex items-center gap-4">
-                                                    <div className="h-12 w-12 rounded-2xl bg-primary/5 flex items-center justify-center text-primary">
-                                                        <CalendarIcon className="h-6 w-6" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-semibold text-foreground">{req.type}</p>
-                                                        <p className="text-xs text-muted-foreground font-medium">{format(new Date(req.date), "MMMM d, yyyy")}</p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex flex-col items-end gap-2">
-                                                    <Badge className={cn(
-                                                        "rounded-full px-4 h-6 text-[10px] font-semibold tracking-[0.12em] uppercase",
-                                                        req.status === 'APPROVED' ? 'bg-emerald-500 hover:bg-emerald-600' :
-                                                            req.status === 'REJECTED' ? 'bg-rose-500 hover:bg-rose-600' : 'bg-amber-500 hover:bg-amber-600'
-                                                    )}>{req.status}</Badge>
-                                                    {req.approver && <p className="text-[10px] text-muted-foreground italic font-medium">By {req.approver.name}</p>}
+                        <Panel title="My requests" description="Status of corrections you've submitted." className="lg:col-span-2" bodyClassName="p-0">
+                            {requests.length > 0 ? (
+                                <ul>
+                                    {requests.map((req) => (
+                                        <li key={req.id} className="flex items-center justify-between gap-4 border-b px-6 py-4 last:border-0">
+                                            <div className="flex items-center gap-4">
+                                                <div className="flex h-10 w-10 items-center justify-center rounded-lg border text-muted-foreground"><CalendarIcon className="h-4 w-4" /></div>
+                                                <div>
+                                                    <p className="font-medium">{String(req.type).replace(/_/g, " ").toLowerCase().replace(/^\w/, (c: string) => c.toUpperCase())}</p>
+                                                    <p className="text-xs text-muted-foreground">{format(new Date(req.date), "MMMM d, yyyy")}{req.reason ? ` · ${req.reason}` : ""}</p>
                                                 </div>
                                             </div>
-                                        )) : (
-                                            <div className="p-12 text-center opacity-40 italic text-sm">No requests found.</div>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                                            <div className="flex flex-col items-end gap-1">
+                                                <StatusPill status={req.status} />
+                                                {req.approver && <p className="text-xs text-muted-foreground">by {req.approver.name}</p>}
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <EmptyState icon={ClipboardList} title="No requests yet" description="Corrections you submit will appear here." />
+                            )}
+                        </Panel>
                     </div>
                 </TabsContent>
 
                 {isPrivileged && (
                     <TabsContent value="manager" className="space-y-8 focus-visible:outline-none">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <Card className="border bg-rose-500 text-white overflow-hidden relative">
-                                <div className="absolute right-0 bottom-0 opacity-10 -mr-10 -mb-10">
-                                    <AlertTriangle className="h-48 w-48" />
-                                </div>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <CardTitle className="text-3xl font-semibold">{approvalsPending.length}</CardTitle>
-                                            <CardDescription className="text-white/80 font-medium uppercase tracking-wider mt-1 font-mono">Pending Approvals</CardDescription>
-                                        </div>
-                                        <div className="h-14 w-14 bg-white/20 rounded-2xl flex items-center justify-center border border-white/20">
-                                            <CheckSquare className="h-8 w-8" />
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm font-medium opacity-90 leading-relaxed mb-4">You have {approvalsPending.length} regularization requests waiting for your signature. Fast approval keeps team metrics accurate.</p>
-                                    <Button variant="secondary" className="w-full rounded-xl font-semibold uppercase tracking-tight h-12 font-mono">View Queue</Button>
-                                </CardContent>
-                            </Card>
+                        <StatGrid>
+                            <Stat label="Pending approvals" value={approvalsPending.length} icon={ClipboardList} tone={approvalsPending.length ? "warn" : "default"} hint={approvalsPending.length ? "Awaiting your decision" : "Queue is clear"} />
+                            <Stat label="Online now" value={<>{presence.online}<span className="text-xl text-muted-foreground"> / {presence.total}</span></>} icon={Users} tone="ok" hint="People active in the last 7 days" progress={presence.total ? (presence.online / presence.total) * 100 : 0} />
+                            <Stat label="Working remote" value={presence.remote} icon={Home} hint={presence.online ? `${Math.round((presence.remote / presence.online) * 100)}% of those online` : "No one online"} />
+                        </StatGrid>
 
-                            <Card className="border bg-[hsl(228_45%_8%)] text-white overflow-hidden relative">
-                                <div className="absolute right-0 bottom-0 opacity-10 -mr-10 -mb-10">
-                                    <Users className="h-48 w-48" />
-                                </div>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <CardTitle className="text-3xl font-semibold">12 / 15</CardTitle>
-                                            <CardDescription className="text-white/80 font-medium uppercase tracking-wider mt-1 font-mono">Team Presence</CardDescription>
-                                        </div>
-                                        <div className="h-14 w-14 bg-white/20 rounded-2xl flex items-center justify-center border border-white/20">
-                                            <Building2 className="h-8 w-8" />
-                                        </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-sm font-medium opacity-90 leading-relaxed mb-4">80% of your team is currently logged in. 3 team members are working remote today.</p>
-                                    <Button variant="secondary" className="w-full rounded-xl font-semibold uppercase tracking-tight h-12 font-mono">Live Presence Map</Button>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        <Card className="border">
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <div>
-                                    <CardTitle>Team Attendance Logs</CardTitle>
-                                    <CardDescription>Live oversight of all active and past sessions.</CardDescription>
-                                </div>
-                                <Button size="sm" variant="outline" className="rounded-xl font-bold">Export CSV</Button>
-                            </CardHeader>
-                            <CardContent className="p-0 border-t">
-                                <div className="divide-y overflow-auto border-b">
-                                    {teamLogs.length > 0 ? teamLogs.map((log, i) => (
-                                        <div key={i} className="p-6 flex items-center justify-between group hover:bg-muted/10 transition-colors">
+                        <Panel title="Approval queue" description="Correction requests from people you manage." bodyClassName="p-0">
+                            {approvalsPending.length > 0 ? (
+                                <ul>
+                                    {approvalsPending.map((req) => (
+                                        <li key={req.id} className="flex flex-col gap-4 border-b px-6 py-4 last:border-0 sm:flex-row sm:items-center sm:justify-between">
                                             <div className="flex items-center gap-4">
-                                                <div className="h-12 w-12 rounded-full overflow-hidden bg-muted border border-primary/10">
-                                                    <img src={log.user.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${log.user.name}`} alt="" />
-                                                </div>
+                                                <PersonAvatar name={req.user?.name} image={req.user?.image} />
                                                 <div>
-                                                    <p className="font- black text-base">{log.user.name}</p>
-                                                    <p className="text-xs font-medium text-muted-foreground opacity-60 font-mono uppercase tracking-[0.12em]">{log.user.role}</p>
+                                                    <p className="font-medium">{req.user?.name}</p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {String(req.type).replace(/_/g, " ").toLowerCase()} · {format(new Date(req.date), "MMM d, yyyy")}{req.reason ? ` · ${req.reason}` : ""}
+                                                    </p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center gap-12">
-                                                <div className="text-center hidden md:block">
-                                                    <p className="text-[10px] font-medium text-muted-foreground uppercase opacity-50 tracking-[0.12em] font-mono">Login</p>
-                                                    <p className="text-sm font-mono font-bold">{format(new Date(log.loginTime), "HH:mm")}</p>
-                                                </div>
-                                                <div className="text-center hidden md:block">
-                                                    <p className="text-[10px] font-medium text-muted-foreground uppercase opacity-50 tracking-[0.12em] font-mono">Logout</p>
-                                                    <p className="text-sm font-mono font-bold">{log.logoutTime ? format(new Date(log.logoutTime), "HH:mm") : 'ACTIVE'}</p>
-                                                </div>
-                                                <div className="text-right min-w-[100px]">
-                                                    <Badge className={cn(
-                                                        "rounded-full px-4 h-7 text-[10px] font-semibold font-mono uppercase tracking-[0.12em]",
-                                                        !log.logoutTime ? 'bg-emerald-500 animate-pulse' : 'bg-muted text-muted-foreground border-none'
-                                                    )}>{!log.logoutTime ? 'ONLINE' : 'OFFLINE'}</Badge>
-                                                </div>
+                                            <div className="flex gap-2">
+                                                <Button size="sm" variant="outline" disabled={deciding === req.id} onClick={() => decideRequest(req.id, "REJECTED")}>
+                                                    <X className="h-4 w-4" /> Reject
+                                                </Button>
+                                                <Button size="sm" disabled={deciding === req.id} onClick={() => decideRequest(req.id, "APPROVED")}>
+                                                    {deciding === req.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Approve
+                                                </Button>
                                             </div>
-                                        </div>
-                                    )) : (
-                                        <div className="p-24 text-center text-muted-foreground opacity-30 italic">No team activity results.</div>
-                                    )}
+                                        </li>
+                                    ))}
+                                </ul>
+                            ) : (
+                                <EmptyState icon={Check} title="All caught up" description="No corrections are waiting for you." />
+                            )}
+                        </Panel>
+
+                        <Panel
+                            title="Team sessions"
+                            description="Clock-ins from the last 7 days."
+                            actions={<Button size="sm" variant="outline" onClick={exportTeamCsv} disabled={teamLogs.length === 0}><Download className="h-4 w-4" /> Export CSV</Button>}
+                            bodyClassName="p-0"
+                        >
+                            {teamLogs.length > 0 ? (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-secondary/40">
+                                            <tr className="border-b">
+                                                {["Person", "Mode", "Login", "Logout", "Duration", "Status"].map(h => (
+                                                    <th key={h} className="h-10 px-6 text-left font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{h}</th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {teamLogs.map((log) => (
+                                                <tr key={log.id} className="border-b last:border-0 hover:bg-secondary/40">
+                                                    <td className="px-6 py-3">
+                                                        <div className="flex items-center gap-3">
+                                                            <PersonAvatar name={log.user?.name} image={log.user?.image} size="sm" />
+                                                            <div>
+                                                                <p className="font-medium">{log.user?.name}</p>
+                                                                <p className="font-mono text-[10px] uppercase tracking-wider text-muted-foreground">{log.user?.role}</p>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-6 py-3 text-muted-foreground">{log.isWfh ? "Remote" : "Office"}</td>
+                                                    <td className="px-6 py-3 font-mono tabular-nums">{format(new Date(log.loginTime), "MMM d, HH:mm")}</td>
+                                                    <td className="px-6 py-3 font-mono tabular-nums">{log.logoutTime ? format(new Date(log.logoutTime), "HH:mm") : "—"}</td>
+                                                    <td className="px-6 py-3 font-mono tabular-nums text-muted-foreground">{fmtMinutes(Math.max(0, differenceInMinutes(log.logoutTime ? new Date(log.logoutTime) : new Date(), new Date(log.loginTime))))}</td>
+                                                    <td className="px-6 py-3"><StatusPill status={log.logoutTime ? "OFFLINE" : "ONLINE"} /></td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
                                 </div>
-                                <div className="p-4 bg-muted/20 text-center">
-                                    <Button variant="ghost" className="text-xs font-semibold text-primary hover:bg-transparent">Show More Records</Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                            ) : (
+                                <EmptyState icon={Users} title="No team activity" description="Sessions from your team will show up here." />
+                            )}
+                        </Panel>
                     </TabsContent>
                 )}
             </Tabs>
         </div>
     );
 }
+
 
 // Helpers
 function getDistance(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -685,4 +662,3 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
         navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true });
     });
 }
-

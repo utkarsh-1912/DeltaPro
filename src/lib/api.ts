@@ -1,24 +1,25 @@
 import { NextResponse } from "next/server";
-import { Prisma, Role } from "@prisma/client";
+import { Prisma, Role, type Organization } from "@prisma/client";
 import { z, ZodError } from "zod";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { HttpError } from "@/lib/errors";
+import { runWithTenant } from "@/server/context";
+import { hasFeature, planFor, type Feature } from "@/server/plans";
+import { getOrganization } from "@/services/organizations";
 
-export class HttpError extends Error {
-    constructor(public status: number, message: string, public details?: unknown) {
-        super(message);
-    }
-}
+export { HttpError };
 
 export type SessionUser = {
     id: string;
     role: Role;
     email?: string | null;
     name?: string | null;
+    organizationId: string;
 };
 
 type RouteContext<P> = { params: Promise<P> };
-type Handler<P> = (ctx: { req: Request; user: SessionUser; params: P }) => Promise<unknown>;
+type Handler<P> = (ctx: { req: Request; user: SessionUser; org: Organization; params: P }) => Promise<unknown>;
 
 export function toErrorResponse(error: unknown): Response {
     if (error instanceof HttpError) {
@@ -41,24 +42,38 @@ function toResponse(result: unknown, status = 200): Response {
     return NextResponse.json(result ?? { ok: true }, { status });
 }
 
+export function assertFeature(org: Organization, feature: Feature) {
+    if (!hasFeature(org.plan, feature)) {
+        const plan = planFor(feature);
+        throw new HttpError(402, `This needs the ${plan.name} plan. An admin can upgrade in Settings → Organization.`, { feature, plan: plan.id });
+    }
+}
+
 /**
- * Wraps an authenticated route handler: resolves the session, enforces roles,
+ * API tier entry point. Resolves the session, opens the tenant context for the caller's
+ * organization (every query below is scoped to it), enforces roles and plan features,
  * awaits Next 15 params and maps thrown errors to JSON responses.
  */
-export function route<P = Record<string, string>>(handler: Handler<P>, opts: { roles?: Role[]; status?: number } = {}) {
+export function route<P = Record<string, string>>(handler: Handler<P>, opts: { roles?: Role[]; feature?: Feature; status?: number } = {}) {
     return async (req: Request, context: RouteContext<P>) => {
         try {
             const session = await auth();
             if (!session?.user?.id) throw new HttpError(401, "Unauthorized");
+            const organizationId = (session.user as any).organizationId as string | undefined;
+            if (!organizationId) throw new HttpError(403, "Your account is not linked to an organization. Ask your administrator to invite you.");
+            const org = await getOrganization(organizationId);
+            if (!org || org.status !== "ACTIVE") throw new HttpError(403, "This organization is suspended.");
             const user: SessionUser = {
                 id: session.user.id,
                 role: session.user.role as Role,
                 email: session.user.email,
                 name: session.user.name,
+                organizationId,
             };
             if (opts.roles && !opts.roles.includes(user.role)) throw new HttpError(403, "Forbidden");
+            if (opts.feature) assertFeature(org, opts.feature);
             const params = (context?.params ? await context.params : {}) as P;
-            return toResponse(await handler({ req, user, params }), opts.status);
+            return await runWithTenant(organizationId, async () => toResponse(await handler({ req, user, org, params }), opts.status), user.id);
         } catch (error) {
             return toErrorResponse(error);
         }

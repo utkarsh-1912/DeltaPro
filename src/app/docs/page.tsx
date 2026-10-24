@@ -1,66 +1,206 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Plus, Search, Folder, FileText, ChevronRight, MoreVertical, Star, History, Users, Settings, Loader2 } from "lucide-react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { Plus, Search, Folder, FileText, Loader2, ArrowLeft, Pencil, Eye, Trash2, Save, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { useToast } from "@/hooks/use-toast";
 import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
+import { EmptyState, FieldLabel, Segmented } from "@/components/page";
+import { EASE } from "@/components/motion";
+
+/** Minimal, safe markdown: headings, lists, quotes, fenced code, inline code/bold/italic/links. No raw HTML. */
+function Markdown({ source }: { source: string }) {
+    const inline = (text: string, key: string): React.ReactNode[] => {
+        const out: React.ReactNode[] = [];
+        const re = /(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\[[^\]]+\]\((https?:\/\/[^)\s]+)\))/g;
+        let last = 0, m: RegExpExecArray | null, i = 0;
+        while ((m = re.exec(text))) {
+            if (m.index > last) out.push(text.slice(last, m.index));
+            const t = m[0];
+            const k = `${key}-${i++}`;
+            if (t.startsWith("`")) out.push(<code key={k} className="rounded bg-secondary px-1.5 py-0.5 font-mono text-[0.9em]">{t.slice(1, -1)}</code>);
+            else if (t.startsWith("**")) out.push(<strong key={k}>{t.slice(2, -2)}</strong>);
+            else if (t.startsWith("*")) out.push(<em key={k}>{t.slice(1, -1)}</em>);
+            else {
+                const label = t.slice(1, t.indexOf("]"));
+                out.push(<a key={k} href={m[2]} target="_blank" rel="noopener noreferrer" className="text-signal underline underline-offset-4">{label}</a>);
+            }
+            last = m.index + t.length;
+        }
+        if (last < text.length) out.push(text.slice(last));
+        return out;
+    };
+
+    const blocks: React.ReactNode[] = [];
+    const lines = source.replace(/\r\n/g, "\n").split("\n");
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
+        if (line.startsWith("```")) {
+            const code: string[] = [];
+            i++;
+            while (i < lines.length && !lines[i].startsWith("```")) code.push(lines[i++]);
+            i++;
+            blocks.push(<pre key={i} className="overflow-x-auto rounded-xl border bg-secondary/50 p-4 font-mono text-sm">{code.join("\n")}</pre>);
+            continue;
+        }
+        const h = /^(#{1,3})\s+(.*)/.exec(line);
+        if (h) {
+            const cls = ["text-3xl font-semibold tracking-tight mt-10", "text-2xl font-semibold tracking-tight mt-8", "text-lg font-semibold mt-6"][h[1].length - 1];
+            blocks.push(React.createElement(`h${h[1].length + 1}`, { key: i, className: cls }, inline(h[2], `h${i}`)));
+            i++;
+            continue;
+        }
+        if (/^\s*[-*]\s+/.test(line) || /^\s*\d+\.\s+/.test(line)) {
+            const ordered = /^\s*\d+\./.test(line);
+            const items: string[] = [];
+            while (i < lines.length && (ordered ? /^\s*\d+\.\s+/ : /^\s*[-*]\s+/).test(lines[i])) items.push(lines[i++].replace(/^\s*(?:[-*]|\d+\.)\s+/, ""));
+            const Tag = ordered ? "ol" : "ul";
+            blocks.push(<Tag key={i} className={cn("my-4 space-y-1.5 pl-6", ordered ? "list-decimal" : "list-disc")}>{items.map((it, j) => <li key={j}>{inline(it, `l${i}-${j}`)}</li>)}</Tag>);
+            continue;
+        }
+        if (line.startsWith(">")) {
+            const quote: string[] = [];
+            while (i < lines.length && lines[i].startsWith(">")) quote.push(lines[i++].replace(/^>\s?/, ""));
+            blocks.push(<blockquote key={i} className="my-4 border-l-2 border-signal pl-4 text-muted-foreground">{inline(quote.join(" "), `q${i}`)}</blockquote>);
+            continue;
+        }
+        if (/^---+$/.test(line.trim())) { blocks.push(<hr key={i} className="my-8" />); i++; continue; }
+        if (!line.trim()) { i++; continue; }
+        const para: string[] = [];
+        while (i < lines.length && lines[i].trim() && !/^(#{1,3}\s|```|>|\s*[-*]\s|\s*\d+\.\s)/.test(lines[i])) para.push(lines[i++]);
+        blocks.push(<p key={i} className="my-4 leading-7">{inline(para.join(" "), `p${i}`)}</p>);
+    }
+    return <div className="max-w-none text-[15px]">{blocks}</div>;
+}
 
 export default function DocsPage() {
     const { toast } = useToast();
     const [workspaces, setWorkspaces] = useState<any[]>([]);
-    const [selectedWorkspace, setSelectedWorkspace] = useState<any>(null);
+    const [selectedWsId, setSelectedWsId] = useState<string | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
 
-    // Create States
     const [isCreateWsOpen, setIsCreateWsOpen] = useState(false);
     const [isCreatePageOpen, setIsCreatePageOpen] = useState(false);
     const [isCreating, setIsCreating] = useState(false);
     const [newWs, setNewWs] = useState({ name: "", description: "" });
     const [newPage, setNewPage] = useState({ title: "", content: "" });
 
-    const fetchWorkspaces = async () => {
+    // Open document
+    const [openPageId, setOpenPageId] = useState<string | null>(null);
+    const [doc, setDoc] = useState<any>(null);
+    const [draft, setDraft] = useState({ title: "", content: "" });
+    const [mode, setMode] = useState<"read" | "edit">("read");
+    const [isSaving, setIsSaving] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
+
+    const selectedWorkspace = workspaces.find(w => w.id === selectedWsId) ?? null;
+    const dirty = !!doc && (draft.title !== doc.title || draft.content !== (doc.content ?? ""));
+
+    const fetchWorkspaces = useCallback(async () => {
         setIsLoading(true);
         try {
             const res = await fetch("/api/docs/workspaces");
             const data = await res.json();
-            const validData = Array.isArray(data) ? data : [];
-            setWorkspaces(validData);
-            if (validData.length > 0 && !selectedWorkspace) {
-                setSelectedWorkspace(validData[0]);
-            } else if (selectedWorkspace) {
-                const updatedWs = validData.find((w: any) => w.id === selectedWorkspace.id);
-                setSelectedWorkspace(updatedWs || validData[0] || null);
-            }
+            const list = Array.isArray(data) ? data : [];
+            setWorkspaces(list);
+            setSelectedWsId(prev => (prev && list.some((w: any) => w.id === prev) ? prev : list[0]?.id ?? null));
         } catch (err) {
             console.error(err);
             toast({ title: "Error", description: "Failed to load workspaces.", variant: "destructive" });
         } finally {
             setIsLoading(false);
         }
+    }, [toast]);
+
+    useEffect(() => { fetchWorkspaces(); }, [fetchWorkspaces]);
+
+    const openDoc = async (id: string) => {
+        setOpenPageId(id);
+        setMode("read");
+        const cached = selectedWorkspace?.pages?.find((p: any) => p.id === id);
+        if (cached) { setDoc(cached); setDraft({ title: cached.title, content: cached.content ?? "" }); }
+        try {
+            const res = await fetch(`/api/docs/pages/${id}`);
+            if (res.ok) {
+                const full = await res.json();
+                setDoc(full);
+                setDraft({ title: full.title, content: full.content ?? "" });
+            }
+        } catch { /* keep cached copy */ }
     };
 
+    const closeDoc = () => {
+        if (dirty && !window.confirm("Discard unsaved changes?")) return;
+        setOpenPageId(null);
+        setDoc(null);
+    };
+
+    const saveDoc = async () => {
+        if (!doc) return;
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/api/docs/pages/${doc.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title: draft.title.trim() || doc.title, content: draft.content }),
+            });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || "Could not save.");
+            }
+            const updated = await res.json();
+            setDoc((d: any) => ({ ...d, ...updated }));
+            setWorkspaces(ws => ws.map(w => w.id !== selectedWsId ? w : { ...w, pages: w.pages?.map((p: any) => p.id === doc.id ? { ...p, ...updated } : p) }));
+            setMode("read");
+            toast({ title: "Saved" });
+        } catch (e: any) {
+            toast({ title: "Save failed", description: e.message, variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const deleteDoc = async () => {
+        if (!doc) return;
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/api/docs/pages/${doc.id}`, { method: "DELETE" });
+            if (!res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.error || "Could not delete.");
+            }
+            toast({ title: "Page deleted" });
+            setConfirmDelete(false);
+            setOpenPageId(null);
+            setDoc(null);
+            fetchWorkspaces();
+        } catch (e: any) {
+            toast({ title: "Delete failed", description: e.message, variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Ctrl/Cmd+S saves while editing
     useEffect(() => {
-        fetchWorkspaces();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+        const onKey = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "s" && mode === "edit" && doc) { e.preventDefault(); saveDoc(); }
+        };
+        window.addEventListener("keydown", onKey);
+        return () => window.removeEventListener("keydown", onKey);
+    });
 
     const handleCreateWorkspace = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newWs.name) {
-            toast({ title: "Validation Error", description: "Workspace name is required.", variant: "destructive" });
-            return;
-        }
-
+        if (!newWs.name) return;
         setIsCreating(true);
         try {
             const res = await fetch("/api/docs/workspaces", {
@@ -68,16 +208,16 @@ export default function DocsPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(newWs),
             });
-
             if (res.ok) {
                 const created = await res.json();
-                toast({ title: "Workspace Created", description: `${newWs.name} has been added.` });
+                toast({ title: "Workspace created", description: newWs.name });
                 setIsCreateWsOpen(false);
                 setNewWs({ name: "", description: "" });
+                setSelectedWsId(created.id);
                 await fetchWorkspaces();
-                setSelectedWorkspace(created); // Auto select new
             } else {
-                toast({ title: "Error", description: "Failed to create workspace", variant: "destructive" });
+                const err = await res.json().catch(() => ({}));
+                toast({ title: "Could not create workspace", description: err.error, variant: "destructive" });
             }
         } catch (error) {
             toast({ title: "Error", description: "Unexpected error occurred.", variant: "destructive" });
@@ -88,11 +228,7 @@ export default function DocsPage() {
 
     const handleCreatePage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!newPage.title || !selectedWorkspace) {
-            toast({ title: "Validation Error", description: "Page title and active workspace are required.", variant: "destructive" });
-            return;
-        }
-
+        if (!newPage.title || !selectedWorkspace) return;
         setIsCreating(true);
         try {
             const res = await fetch("/api/docs/pages", {
@@ -100,14 +236,16 @@ export default function DocsPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ ...newPage, workspaceId: selectedWorkspace.id }),
             });
-
             if (res.ok) {
-                toast({ title: "Page Created", description: `"${newPage.title}" has been added.` });
+                const created = await res.json().catch(() => null);
+                toast({ title: "Page created", description: newPage.title });
                 setIsCreatePageOpen(false);
                 setNewPage({ title: "", content: "" });
-                fetchWorkspaces(); // Refresh to get nested pages
+                await fetchWorkspaces();
+                if (created?.id) { openDoc(created.id); setMode("edit"); }
             } else {
-                toast({ title: "Error", description: "Failed to create page", variant: "destructive" });
+                const err = await res.json().catch(() => ({}));
+                toast({ title: "Could not create page", description: err.error, variant: "destructive" });
             }
         } catch (error) {
             toast({ title: "Error", description: "Unexpected error occurred.", variant: "destructive" });
@@ -116,230 +254,239 @@ export default function DocsPage() {
         }
     };
 
-    const filteredWorkspaces = workspaces.filter(ws => ws.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const q = searchTerm.trim().toLowerCase();
+    const filteredWorkspaces = workspaces.filter(ws =>
+        !q || ws.name.toLowerCase().includes(q) || ws.pages?.some((p: any) => p.title?.toLowerCase().includes(q))
+    );
+    const pages = useMemo(() => {
+        const list = [...(selectedWorkspace?.pages ?? [])];
+        list.sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt));
+        return q ? list.filter(p => p.title?.toLowerCase().includes(q) || p.content?.toLowerCase().includes(q)) : list;
+    }, [selectedWorkspace, q]);
+    const totalPages = workspaces.reduce((s, w) => s + (w.pages?.length ?? 0), 0);
+    const words = (s: string) => (s.trim() ? s.trim().split(/\s+/).length : 0);
 
     return (
-        <div className="flex flex-1 overflow-hidden rounded-2xl border bg-card/60 shadow-lg h-[calc(100vh-8rem)]">
-            {/* SIDEBAR NAVIGATION */}
-            <div className="w-80 border-r bg-muted/30 flex flex-col pt-2">
-                <div className="p-6 pb-4 border-b space-y-4">
+        <div className="flex h-[calc(100vh-7rem)] overflow-hidden rounded-2xl border bg-card">
+            {/* Workspace rail */}
+            <aside className="hidden w-72 shrink-0 flex-col border-r bg-secondary/30 md:flex">
+                <div className="space-y-4 border-b p-5">
                     <div className="flex items-center justify-between">
-                        <h2 className="text-xl font-semibold tracking-tight">Workspaces</h2>
-                        <Dialog open={isCreateWsOpen} onOpenChange={setIsCreateWsOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="secondary" size="icon" className="h-8 w-8 rounded-full shadow-sm hover:bg-primary hover:text-primary-foreground transition-all"><Plus className="h-4 w-4" /></Button>
-                            </DialogTrigger>
-                            <DialogContent className="sm:max-w-[425px] border bg-background/95 rounded-2xl">
-                                <form onSubmit={handleCreateWorkspace}>
-                                    <DialogHeader>
-                                        <DialogTitle>Create Workspace</DialogTitle>
-                                        <DialogDescription>Add a new top-level directory for your team's documents.</DialogDescription>
-                                    </DialogHeader>
-                                    <div className="grid gap-4 py-6">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="ws-name">Workspace Name</Label>
-                                            <Input id="ws-name" required placeholder="e.g. Engineering Handbook" value={newWs.name} onChange={(e) => setNewWs({ ...newWs, name: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label htmlFor="ws-desc">Description</Label>
-                                            <Textarea id="ws-desc" placeholder="What goes in this workspace?" value={newWs.description} onChange={(e) => setNewWs({ ...newWs, description: e.target.value })} className="h-24" />
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button type="button" variant="ghost" onClick={() => setIsCreateWsOpen(false)}>Cancel</Button>
-                                        <Button type="submit" disabled={isCreating}>
-                                            {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Workspace
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
+                        <div>
+                            <p className="font-mono-label text-muted-foreground">Knowledge</p>
+                            <h2 className="mt-1 text-xl font-semibold tracking-tight">Workspaces</h2>
+                        </div>
+                        <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setIsCreateWsOpen(true)} aria-label="New workspace"><Plus className="h-4 w-4" /></Button>
                     </div>
                     <div className="relative">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            placeholder="Find workspace..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            className="pl-9 bg-background/50 h-10 text-sm border-none shadow-sm focus-visible:ring-1 rounded-xl"
-                        />
+                        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input placeholder="Search pages…" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-9 pl-9" />
                     </div>
                 </div>
-
-                <ScrollArea className="flex-1 p-4">
-                    <div className="space-y-1">
-                        {isLoading && workspaces.length === 0 ? (
-                            [1, 2, 3].map(i => <div key={i} className="h-10 bg-muted/50 rounded-lg animate-pulse mb-2" />)
-                        ) : filteredWorkspaces.length === 0 ? (
-                            <div className="p-4 text-center text-xs text-muted-foreground italic">No workspaces found.</div>
-                        ) : (
-                            filteredWorkspaces.map((ws: any) => (
-                                <button
-                                    key={ws.id}
-                                    onClick={() => setSelectedWorkspace(ws)}
-                                    className={cn(
-                                        "w-full flex items-center justify-between p-3 rounded-xl text-sm font-bold transition-all group",
-                                        selectedWorkspace?.id === ws.id
-                                            ? "bg-primary text-primary-foreground  scale-[1.02]"
-                                            : "hover:bg-muted/80 text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    <div className="flex items-center gap-3">
-                                        <Folder className={cn("h-4 w-4", selectedWorkspace?.id === ws.id ? "text-primary-foreground fill-primary-foreground/20" : "text-signal fill-blue-500/20")} />
-                                        <span className="truncate max-w-[150px]">{ws.name}</span>
-                                    </div>
-                                    <ChevronRight className={cn("h-4 w-4 transition-transform", selectedWorkspace?.id === ws.id ? "rotate-90" : "opacity-0 group-hover:opacity-100")} />
-                                </button>
-                            ))
-                        )}
-                    </div>
-                </ScrollArea>
-
-                <div className="p-4 border-t bg-muted/40">
-                    <Button variant="outline" className="w-full justify-start gap-3 h-10 rounded-xl border-dashed hover:border-solid transition-all text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-primary font-mono">
-                        <Settings className="h-4 w-4" /> Workspace Settings
-                    </Button>
+                <nav className="flex-1 space-y-0.5 overflow-y-auto p-3">
+                    {isLoading && workspaces.length === 0 ? (
+                        [0, 1, 2].map(i => <div key={i} className="mb-1 h-10 animate-pulse rounded-lg bg-secondary" />)
+                    ) : filteredWorkspaces.length === 0 ? (
+                        <p className="p-4 text-center text-sm text-muted-foreground">No workspaces match.</p>
+                    ) : filteredWorkspaces.map((ws: any) => {
+                        const active = ws.id === selectedWsId;
+                        return (
+                            <button
+                                key={ws.id}
+                                onClick={() => { if (openPageId) closeDoc(); setSelectedWsId(ws.id); }}
+                                className={cn("relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition-colors", active ? "text-foreground" : "text-muted-foreground hover:text-foreground")}
+                            >
+                                {active && <motion.span layoutId="ws-pill" className="absolute inset-0 rounded-lg border bg-card" transition={{ type: "spring", stiffness: 420, damping: 36 }} />}
+                                <Folder className={cn("relative h-4 w-4 shrink-0", active && "text-signal")} />
+                                <span className="relative flex-1 truncate font-medium">{ws.name}</span>
+                                <span className="relative font-mono text-[11px] text-muted-foreground">{ws.pages?.length ?? 0}</span>
+                            </button>
+                        );
+                    })}
+                </nav>
+                <div className="border-t p-5">
+                    <p className="font-mono-label text-muted-foreground">{workspaces.length} workspaces · {totalPages} pages</p>
                 </div>
-            </div>
+            </aside>
 
-            {/* MAIN CONTENT AREA */}
-            <div className="flex-1 flex flex-col bg-muted/10 relative overflow-hidden">
-                {selectedWorkspace ? (
-                    <>
-                        <div className="p-8 border-b bg-background/80 sticky top-0 z-10 flex items-center justify-between">
-                            <div>
-                                <div className="flex items-center gap-2 text-xs font-semibold text-primary mb-2 font-mono uppercase tracking-[0.12em]">
-                                    <Folder className="h-3 w-3 fill-primary/20" /> Active Workspace
+            {/* Main */}
+            <main className="relative flex min-w-0 flex-1 flex-col">
+                <AnimatePresence mode="wait">
+                    {openPageId && doc ? (
+                        <motion.div key={`doc-${openPageId}`} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -12 }} transition={{ duration: 0.35, ease: EASE }} className="flex min-h-0 flex-1 flex-col">
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-b px-6 py-3">
+                                <div className="flex min-w-0 items-center gap-2">
+                                    <Button variant="ghost" size="sm" onClick={closeDoc}><ArrowLeft className="h-4 w-4" /> {selectedWorkspace?.name}</Button>
+                                    {dirty && <span className="font-mono-label text-amber-600 dark:text-amber-400">Unsaved</span>}
                                 </div>
-                                <h1 className="page-title ">{selectedWorkspace.name}</h1>
-                                <p className="text-sm font-medium text-muted-foreground mt-2 max-w-2xl leading-relaxed">{selectedWorkspace.description || "Organize your team's knowledge and documentation in this collaborative space."}</p>
+                                <div className="flex items-center gap-2">
+                                    <Segmented value={mode} onChange={setMode} options={[{ value: "read", label: "Read", icon: Eye }, { value: "edit", label: "Edit", icon: Pencil }]} />
+                                    {mode === "edit" && <Button size="sm" onClick={saveDoc} disabled={isSaving || !dirty}>{isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save</Button>}
+                                    <Button size="icon" variant="ghost" className="h-9 w-9 text-muted-foreground hover:text-destructive" onClick={() => setConfirmDelete(true)} aria-label="Delete page"><Trash2 className="h-4 w-4" /></Button>
+                                </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                                <Button variant="secondary" className="rounded-full shadow-sm">
-                                    <Users className="mr-2 h-4 w-4" />
-                                    {selectedWorkspace.owner ? '1 Owner' : 'Team'}
-                                </Button>
-
-                                <Dialog open={isCreatePageOpen} onOpenChange={setIsCreatePageOpen}>
-                                    <DialogTrigger asChild>
-                                        <Button className="rounded-full hover:shadow-primary/30 transition-all"><Plus className="mr-2 h-4 w-4" /> New Page</Button>
-                                    </DialogTrigger>
-                                    <DialogContent className="sm:max-w-[600px] border bg-background/95 rounded-2xl">
-                                        <form onSubmit={handleCreatePage}>
-                                            <DialogHeader>
-                                                <DialogTitle>Create Document</DialogTitle>
-                                                <DialogDescription>Add a new wealthy text document to {selectedWorkspace.name}.</DialogDescription>
-                                            </DialogHeader>
-                                            <div className="grid gap-4 py-6">
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="page-title">Document Title</Label>
-                                                    <Input id="page-title" required placeholder="e.g. Q3 Architecture Overview" value={newPage.title} onChange={(e) => setNewPage({ ...newPage, title: e.target.value })} className="text-lg font-bold" />
-                                                </div>
-                                                <div className="space-y-2">
-                                                    <Label htmlFor="page-content">Initial Content (Markdown)</Label>
-                                                    <Textarea id="page-content" placeholder="# Overview\n\nWrite something brilliant..." value={newPage.content} onChange={(e) => setNewPage({ ...newPage, content: e.target.value })} className="h-48 font-mono text-sm leading-relaxed" />
-                                                </div>
-                                            </div>
-                                            <DialogFooter>
-                                                <Button type="button" variant="ghost" onClick={() => setIsCreatePageOpen(false)}>Cancel</Button>
-                                                <Button type="submit" disabled={isCreating}>
-                                                    {isCreating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Create Document
-                                                </Button>
-                                            </DialogFooter>
-                                        </form>
-                                    </DialogContent>
-                                </Dialog>
-
-                            </div>
-                        </div>
-
-                        <ScrollArea className="flex-1">
-                            <div className="p-8">
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    {/* QUICK ACTIONS / FAVORITES */}
-                                    <Card className="col-span-full border border-primary/20 bg-primary/5 p-1 shadow-md group rounded-2xl overflow-hidden">
-                                        <CardContent className="bg-background rounded-xl p-6 flex items-center justify-between">
-                                            <div className="flex items-center gap-4">
-                                                <div className="h-14 w-14 bg-rose-500 text-white rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                                                    <Star className="h-6 w-6 fill-white/20" />
-                                                </div>
-                                                <div>
-                                                    <h3 className="font-semibold text-lg tracking-tight">Starred Documents</h3>
-                                                    <p className="text-sm font-medium text-muted-foreground">Quick access to essential resources.</p>
-                                                </div>
-                                            </div>
-                                            <Button variant="ghost" className="transition-transform group-hover:translate-x-2 rounded-full font-bold">View favorites <ChevronRight className="ml-2 h-4 w-4" /></Button>
-                                        </CardContent>
-                                    </Card>
-
-                                    {/* PAGES LIST */}
-                                    <div className="col-span-full space-y-4 mt-4">
-                                        <div className="flex items-center justify-between">
-                                            <h3 className="text-xl font-semibold flex items-center gap-2 tracking-tight"><FileText className="h-5 w-5 text-muted-foreground fill-muted-foreground/20" /> Library</h3>
-                                            <Button variant="ghost" size="sm" className="text-xs font-bold text-muted-foreground rounded-full hover:bg-muted"><History className="mr-2 h-4 w-4" /> Activity Log</Button>
-                                        </div>
-
-                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                                            <AnimatePresence mode="popLayout">
-                                                {(!selectedWorkspace.pages || selectedWorkspace.pages.length === 0) ? (
-                                                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="col-span-full p-16 text-center border border-dashed border-muted-foreground/20 rounded-2xl bg-muted/10">
-                                                        <FileText className="h-16 w-16 text-muted-foreground/30 mx-auto mb-4" />
-                                                        <p className="text-sm font-bold text-muted-foreground">No pages found in this workspace yet.</p>
-                                                        <Button onClick={() => setIsCreatePageOpen(true)} variant="outline" className="mt-4 rounded-full border border-dashed hover:border-solid hover:bg-primary/5">Create First Page</Button>
-                                                    </motion.div>
-                                                ) : (
-                                                    selectedWorkspace.pages.map((page: any, idx: number) => (
-                                                        <motion.div
-                                                            key={page.id}
-                                                            layout
-                                                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                                                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                                                            exit={{ opacity: 0, scale: 0.9 }}
-                                                            transition={{ delay: idx * 0.05, type: "spring" }}
-                                                            whileHover={{ y: -4 }}
-                                                            className="h-full"
-                                                        >
-                                                            <Card className="cursor-pointer h-full flex flex-col hover:border-primary/40 focus-within:ring-2 focus-within:ring-primary/20 transition-all group border rounded-2xl overflow-hidden relative bg-card/80 ">
-                                                                <CardHeader className="p-5 pb-3 flex flex-row items-center justify-between">
-                                                                    <div className="h-10 w-10 bg-signal/10 text-signal rounded-xl flex items-center justify-center group-hover:bg-signal group-hover:text-white transition-all group-hover:shadow-blue-500/30">
-                                                                        <FileText className="h-5 w-5" />
-                                                                    </div>
-                                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-background"><MoreVertical className="h-4 w-4" /></Button>
-                                                                </CardHeader>
-                                                                <CardContent className="p-5 pt-2 flex-1">
-                                                                    <h4 className="font-bold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2">{page.title}</h4>
-                                                                    <p className="text-xs font-medium text-muted-foreground mt-2 line-clamp-3 leading-relaxed">{page.content || "Empty page..."}</p>
-                                                                </CardContent>
-                                                                <div className="p-4 bg-muted/20 border-t flex flex-col justify-between mt-auto">
-                                                                    <div className="flex items-center justify-between text-[10px] uppercase font-semibold tracking-[0.12em] text-muted-foreground font-mono">
-                                                                        <span className="flex items-center gap-1.5"><History className="h-3 w-3" /> {format(new Date(page.updatedAt), "MMM d")}</span>
-                                                                        <span className="bg-emerald-500/10 text-emerald-600 px-2 py-0.5 rounded-full">Active</span>
-                                                                    </div>
-                                                                </div>
-                                                            </Card>
-                                                        </motion.div>
-                                                    ))
+                            <div className="min-h-0 flex-1 overflow-y-auto">
+                                <article className="mx-auto max-w-3xl px-6 py-12">
+                                    <p className="font-mono-label text-muted-foreground">
+                                        {selectedWorkspace?.name} · updated {doc.updatedAt ? formatDistanceToNow(new Date(doc.updatedAt), { addSuffix: true }) : "just now"} · {words(draft.content)} words
+                                    </p>
+                                    {mode === "edit" ? (
+                                        <>
+                                            <input
+                                                value={draft.title}
+                                                onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                                                className="mt-4 w-full bg-transparent text-4xl font-semibold tracking-tight outline-none sm:text-5xl"
+                                                placeholder="Untitled"
+                                            />
+                                            <Textarea
+                                                value={draft.content}
+                                                onChange={(e) => setDraft({ ...draft, content: e.target.value })}
+                                                className="mt-8 min-h-[55vh] resize-none border-0 bg-transparent px-0 font-mono text-sm leading-7 shadow-none focus-visible:ring-0"
+                                                placeholder={"Write in Markdown.\n\n# Heading\n- bullet\n**bold**, *italic*, `code`, [link](https://…)"}
+                                                autoFocus
+                                            />
+                                            <p className="font-mono-label text-muted-foreground">Ctrl/⌘ + S to save</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <h1 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight sm:text-5xl">{doc.title}</h1>
+                                            <div className="mt-10">
+                                                {doc.content?.trim() ? <Markdown source={doc.content} /> : (
+                                                    <button onClick={() => setMode("edit")} className="text-muted-foreground hover:text-foreground">This page is empty. Start writing →</button>
                                                 )}
-                                            </AnimatePresence>
-                                        </div>
+                                            </div>
+                                        </>
+                                    )}
+                                </article>
+                            </div>
+                        </motion.div>
+                    ) : selectedWorkspace ? (
+                        <motion.div key={`ws-${selectedWorkspace.id}`} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} transition={{ duration: 0.35, ease: EASE }} className="flex min-h-0 flex-1 flex-col">
+                            <header className="relative overflow-hidden border-b px-8 py-10">
+                                <div className="dotgrid absolute inset-0 opacity-40 [mask-image:linear-gradient(90deg,transparent,#000)]" />
+                                <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
+                                    <div className="min-w-0">
+                                        <p className="font-mono-label text-muted-foreground">Workspace · {selectedWorkspace.pages?.length ?? 0} pages</p>
+                                        <h1 className="mt-3 text-4xl font-semibold leading-[1] tracking-tight">{selectedWorkspace.name}</h1>
+                                        <p className="mt-3 max-w-2xl text-muted-foreground">{selectedWorkspace.description || "Team knowledge, policies and how-tos."}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" className="md:hidden" onClick={() => setIsCreateWsOpen(true)}><Plus className="h-4 w-4" /> Workspace</Button>
+                                        <Button onClick={() => setIsCreatePageOpen(true)}><Plus className="h-4 w-4" /> New page</Button>
                                     </div>
                                 </div>
+                                {/* Mobile workspace switcher */}
+                                <div className="relative mt-6 flex gap-1.5 overflow-x-auto md:hidden">
+                                    {workspaces.map(ws => (
+                                        <button key={ws.id} onClick={() => setSelectedWsId(ws.id)} className={cn("shrink-0 rounded-full border px-3 py-1.5 text-sm", ws.id === selectedWsId ? "border-foreground bg-foreground text-background" : "text-muted-foreground")}>{ws.name}</button>
+                                    ))}
+                                </div>
+                            </header>
+                            <div className="min-h-0 flex-1 overflow-y-auto">
+                                {pages.length === 0 ? (
+                                    <EmptyState
+                                        icon={FileText}
+                                        title={q ? "No pages match" : "No pages yet"}
+                                        description={q ? "Try another search." : "Write the first page for this workspace."}
+                                        action={!q ? <Button onClick={() => setIsCreatePageOpen(true)}><Plus className="h-4 w-4" /> New page</Button> : undefined}
+                                        className="py-24"
+                                    />
+                                ) : (
+                                    <ul>
+                                        {pages.map((page: any, idx: number) => (
+                                            <motion.li key={page.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(idx, 10) * 0.03, ease: EASE }}>
+                                                <button
+                                                    onClick={() => openDoc(page.id)}
+                                                    className="group grid w-full grid-cols-[auto_1fr_auto] items-center gap-5 border-b px-8 py-5 text-left transition-colors hover:bg-secondary/40"
+                                                >
+                                                    <span className="font-mono text-[11px] text-muted-foreground">{String(idx + 1).padStart(2, "0")}</span>
+                                                    <div className="min-w-0">
+                                                        <p className="truncate text-lg font-medium tracking-tight group-hover:text-signal">{page.title}</p>
+                                                        <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">{page.content?.replace(/[#*`>\-\[\]]/g, "").slice(0, 180) || "Empty page"}</p>
+                                                    </div>
+                                                    <span className="whitespace-nowrap text-xs text-muted-foreground">{formatDistanceToNow(new Date(page.updatedAt), { addSuffix: true })}</span>
+                                                </button>
+                                            </motion.li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
-                        </ScrollArea>
-                    </>
-                ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center p-12 text-center space-y-6 bg-muted/5">
-                        <div className="h-32 w-32 bg-background border-4 border-muted/50 rounded-2xl flex items-center justify-center shadow-lg shadow-muted">
-                            <Folder className="h-16 w-16 text-muted-foreground/40" />
+                        </motion.div>
+                    ) : (
+                        <motion.div key="empty" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-1 items-center justify-center">
+                            <EmptyState
+                                icon={BookOpen}
+                                title={isLoading ? "Loading…" : "No workspaces yet"}
+                                description="A workspace groups related pages: a handbook, policies, runbooks."
+                                action={!isLoading ? <Button onClick={() => setIsCreateWsOpen(true)}><Plus className="h-4 w-4" /> Create workspace</Button> : undefined}
+                            />
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+            </main>
+
+            {/* Create workspace */}
+            <Dialog open={isCreateWsOpen} onOpenChange={setIsCreateWsOpen}>
+                <DialogContent className="sm:max-w-[440px]">
+                    <form onSubmit={handleCreateWorkspace}>
+                        <DialogHeader>
+                            <p className="font-mono-label text-muted-foreground">New workspace</p>
+                            <DialogTitle className="text-2xl">Create a workspace</DialogTitle>
+                            <DialogDescription>A top-level space for a team or topic.</DialogDescription>
+                        </DialogHeader>
+                        <div className="grid gap-4 py-6">
+                            <div className="space-y-2">
+                                <FieldLabel htmlFor="ws-name">Name</FieldLabel>
+                                <Input id="ws-name" required placeholder="Engineering handbook" value={newWs.name} onChange={(e) => setNewWs({ ...newWs, name: e.target.value })} />
+                            </div>
+                            <div className="space-y-2">
+                                <FieldLabel htmlFor="ws-desc">Description</FieldLabel>
+                                <Textarea id="ws-desc" placeholder="What lives here?" value={newWs.description} onChange={(e) => setNewWs({ ...newWs, description: e.target.value })} className="h-24" />
+                            </div>
                         </div>
-                        <div className="max-w-md space-y-3">
-                            <h2 className="text-3xl font-semibold tracking-tight">Select a Workspace</h2>
-                            <p className="text-sm font-medium text-muted-foreground leading-relaxed">Choose a workspace from the sidebar to view documents, or initialize a new collaborative space for your team.</p>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsCreateWsOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isCreating}>{isCreating && <Loader2 className="h-4 w-4 animate-spin" />} Create</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Create page */}
+            <Dialog open={isCreatePageOpen} onOpenChange={setIsCreatePageOpen}>
+                <DialogContent className="sm:max-w-[440px]">
+                    <form onSubmit={handleCreatePage}>
+                        <DialogHeader>
+                            <p className="font-mono-label text-muted-foreground">New page · {selectedWorkspace?.name}</p>
+                            <DialogTitle className="text-2xl">Name your page</DialogTitle>
+                            <DialogDescription>You'll go straight into the editor.</DialogDescription>
+                        </DialogHeader>
+                        <div className="py-6">
+                            <FieldLabel htmlFor="page-title">Title</FieldLabel>
+                            <Input id="page-title" required autoFocus placeholder="Leave policy 2026" value={newPage.title} onChange={(e) => setNewPage({ ...newPage, title: e.target.value })} className="mt-2" />
                         </div>
-                        <Button size="lg" onClick={() => setIsCreateWsOpen(true)} className="rounded-full px-8 "><Plus className="mr-2 h-4 w-4" /> Create Workspace</Button>
-                    </div>
-                )}
-            </div>
+                        <DialogFooter>
+                            <Button type="button" variant="ghost" onClick={() => setIsCreatePageOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isCreating}>{isCreating && <Loader2 className="h-4 w-4 animate-spin" />} Create and edit</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Delete “{doc?.title}”?</AlertDialogTitle>
+                        <AlertDialogDescription>This can't be undone. Any child pages move up one level.</AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel disabled={isSaving}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={(e) => { e.preventDefault(); deleteDoc(); }} disabled={isSaving} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                            {isSaving && <Loader2 className="h-4 w-4 animate-spin" />} Delete
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

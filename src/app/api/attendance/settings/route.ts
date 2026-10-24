@@ -1,9 +1,8 @@
 import { z } from "zod";
 import { Role } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import { audit } from "@/lib/activity";
 import { parseBody, route } from "@/lib/api";
 import { getAttendanceSettings } from "@/services/attendance";
+import { updateAttendanceSettings } from "@/services/attendance-queries";
 
 export const dynamic = 'force-dynamic';
 
@@ -21,9 +20,5 @@ const schema = z.object({
 }).strip();
 
 export const PATCH = route(async ({ req, user }) => {
-    const data = await parseBody(req, schema);
-    const current = await getAttendanceSettings();
-    const updated = await prisma.attendanceSettings.update({ where: { id: current.id }, data });
-    await audit(prisma, user.id, "attendance.settings_updated", "AttendanceSettings", updated.id, data);
-    return updated;
+    return updateAttendanceSettings(user, await parseBody(req, schema));
 }, { roles: [Role.ADMIN, Role.HR] });

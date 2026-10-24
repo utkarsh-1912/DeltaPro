@@ -1,8 +1,7 @@
 import { z } from "zod";
 import { format, parseISO } from "date-fns";
-import { prisma } from "@/lib/prisma";
 import { HttpError, parseBody, route } from "@/lib/api";
-import { rotaEventData } from "@/services/rota";
+import { explainRotaInput } from "@/services/rota";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -24,12 +23,9 @@ export const POST = route(async ({ req }) => {
         throw new HttpError(503, "AI explanations are off. Set GEMINI_API_KEY on the server to turn them on.");
     }
     const { generationId } = await parseBody(req, schema);
-    const gen = await prisma.rotaGeneration.findUnique({ where: { id: generationId } });
-    if (!gen) throw new HttpError(404, "Rota not found.");
-
-    const previous = await prisma.rotaGeneration.findFirst({ where: { teamId: gen.teamId, startDate: { lt: gen.startDate } }, orderBy: { startDate: "desc" } });
-    const data = await rotaEventData(gen);
-    const shifts = await prisma.shift.findMany({ where: { teamId: gen.teamId }, orderBy: { sequence: "asc" } });
+    const input = await explainRotaInput(generationId);
+    if (!input) throw new HttpError(404, "Rota not found.");
+    const { gen, previous, data, shifts } = input;
     const shiftName = new Map(shifts.map(s => [s.id, s.name]));
     const prevAssignments = (previous?.assignments ?? {}) as Record<string, string | null>;
 
