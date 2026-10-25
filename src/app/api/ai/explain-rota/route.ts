@@ -26,7 +26,7 @@ export const POST = route(async ({ req }) => {
     const input = await explainRotaInput(generationId);
     if (!input) throw new HttpError(404, "Rota not found.");
     const { gen, previous, data, shifts } = input;
-    const shiftName = new Map(shifts.map(s => [s.id, s.name]));
+    const shiftName = new Map<string, string>(shifts.map((s: { id: string; name: string }) => [s.id, s.name]));
     const prevAssignments = (previous?.assignments ?? {}) as Record<string, string | null>;
 
     const { explainRotaFlow } = await import("@/ai/flows/explain-rota");

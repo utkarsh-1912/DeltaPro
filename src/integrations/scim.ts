@@ -1,7 +1,4 @@
 import type { EmployeeProfile, User } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
-import { HttpError } from "@/lib/api";
-import { decryptJson, safeEqual } from "./crypto";
 import { appBaseUrl } from "./http";
 
 export const SCIM_USER = "urn:ietf:params:scim:schemas:core:2.0:User";
@@ -15,16 +12,6 @@ export function scimJson(body: unknown, status = 200) {
 
 export function scimError(status: number, detail: string) {
     return scimJson({ schemas: [SCIM_ERROR], status: String(status), detail }, status);
-}
-
-/** Returns the SCIM integration whose bearer token matches, or throws 401. */
-export async function authenticateScim(req: Request) {
-    const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    if (!token) throw new HttpError(401, "Missing bearer token");
-    const integrations = await prisma.integration.findMany({ where: { provider: "scim", enabled: true } });
-    const match = integrations.find(i => safeEqual(decryptJson(i.credentials).token, token));
-    if (!match) throw new HttpError(401, "Invalid bearer token");
-    return match;
 }
 
 type UserWithProfile = User & { profile: EmployeeProfile | null; manager?: { id: string } | null };

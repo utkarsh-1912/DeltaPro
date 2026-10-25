@@ -3,7 +3,8 @@ import { prisma } from "@/lib/prisma";
 import { audit, notify, type Db } from "@/lib/activity";
 import { HttpError, assertCanApproveFor, canActOnUser, isPeopleAdmin, type SessionUser } from "@/lib/api";
 import { emitEvent, scheduleDispatch } from "@/integrations/events";
-import { approversFor, person, toUtcDay, weekdaysBetween, ymd } from "./shared";
+import { approversFor, person, toUtcDay, ymd } from "./shared";
+import { workingDaysBetween } from "./holidays";
 
 export const LEAVE_TYPES = ["CASUAL", "SICK", "EARNED", "UNPAID"] as const;
 export type LeaveType = (typeof LEAVE_TYPES)[number];
@@ -56,8 +57,8 @@ export async function createLeaveRequest(actor: SessionUser, input: CreateLeaveI
     const isHalfDay = !!input.isHalfDay;
     if (isHalfDay && start.getTime() !== end.getTime()) throw new HttpError(400, "A half day must start and end on the same date.");
 
-    const days = weekdaysBetween(start, end);
-    if (days === 0) throw new HttpError(400, "The selected dates fall on a weekend.");
+    const days = await workingDaysBetween(start, end); // weekdays minus company holidays
+    if (days === 0) throw new HttpError(400, "The selected dates fall on weekends or company holidays.");
     const duration = isHalfDay ? 0.5 : days;
     const year = start.getUTCFullYear();
     const isPaid = type !== "UNPAID";
