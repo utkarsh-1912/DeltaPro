@@ -36,7 +36,15 @@ import {
   CalendarRange,
   PanelLeftClose,
   PanelLeftOpen,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Banknote,
+  Receipt,
+  Laptop,
+  Target,
+  ClipboardCheck,
+  FolderLock,
+  CalendarHeart,
+  Building2
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useTheme } from "next-themes";
@@ -434,6 +442,18 @@ const NAV: NavGroup[] = [
       { href: "/employees", icon: Users, label: "Directory" },
       { href: "/attendance", icon: Clock, label: "Attendance" },
       { href: "/leave", icon: CalendarOff, label: "Leave" },
+      { href: "/holidays", icon: CalendarHeart, label: "Holidays" },
+      { href: "/onboarding", icon: ClipboardCheck, label: "Onboarding" },
+      { href: "/documents", icon: FolderLock, label: "Documents" },
+    ],
+  },
+  {
+    title: "Pay & growth",
+    items: [
+      { href: "/payroll", icon: Banknote, label: "Payroll" },
+      { href: "/expenses", icon: Receipt, label: "Expenses" },
+      { href: "/assets", icon: Laptop, label: "Assets" },
+      { href: "/performance", icon: Target, label: "Performance" },
     ],
   },
   {
@@ -456,6 +476,7 @@ const NAV: NavGroup[] = [
     title: "Administration",
     items: [
       { href: "/admin", icon: SlidersHorizontal, label: "Admin console", roles: MANAGERS },
+      { href: "/organization", icon: Building2, label: "Organization", roles: ["ADMIN", "HR"] },
       { href: "/integrations", icon: Plug, label: "Integrations", roles: ["ADMIN", "HR"] },
       { href: "/settings", icon: Settings, label: "Settings" },
     ],

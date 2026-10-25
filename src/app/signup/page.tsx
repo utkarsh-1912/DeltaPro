@@ -25,6 +25,7 @@ import { AuthPanel } from "@/components/auth-panel";
 const signupSchema = z
   .object({
     name: z.string().min(2, "Name must be at least 2 characters."),
+    company: z.string().max(100).optional(),
     email: z.string().email("Invalid email address."),
     password: z.string().min(8, "Password must be at least 8 characters."),
     confirmPassword: z.string(),
@@ -45,6 +46,7 @@ export default function SignupPage() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       name: "",
+      company: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -57,7 +59,7 @@ export default function SignupPage() {
       const register = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: values.name, email: values.email, password: values.password }),
+        body: JSON.stringify({ name: values.name, company: values.company || undefined, email: values.email, password: values.password }),
       });
       if (!register.ok) {
         const data = await register.json().catch(() => ({}));
@@ -83,9 +85,14 @@ export default function SignupPage() {
         });
         router.push("/login");
       } else {
+        const created = await register.json().catch(() => null);
         toast({
           title: "Account Created",
-          description: "You have been successfully signed up.",
+          description: created?.organization
+            ? created.organization.created
+              ? `${created.organization.name} is ready. You're its first admin.`
+              : `You joined ${created.organization.name}.`
+            : "You have been successfully signed up.",
         });
         router.push("/dashboard");
       }
@@ -139,6 +146,25 @@ export default function SignupPage() {
                         disabled={isLoading}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="company"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-foreground">Company</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Acme Industries"
+                        className="bg-background/50 border-input/60 focus:bg-background transition-colors"
+                        {...field}
+                        disabled={isLoading}
+                      />
+                    </FormControl>
+                    <p className="text-xs text-muted-foreground">If your company already uses DeltaPro with your email domain, you'll join it instead.</p>
                     <FormMessage />
                   </FormItem>
                 )}

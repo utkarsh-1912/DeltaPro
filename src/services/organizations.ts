@@ -1,7 +1,7 @@
 import { Plan, Role, type Organization } from "@prisma/client";
 import { rootPrisma, prisma } from "@/lib/prisma";
 import { HttpError } from "@/lib/errors";
-import { PLANS, seatLimitOf } from "@/server/plans";
+import { FEATURE_LABELS, PLANS, seatLimitOf } from "@/server/plans";
 import { audit } from "@/lib/activity";
 
 const CACHE_MS = 30_000;
@@ -98,4 +98,16 @@ export async function updateOrganization(actor: { id: string; role: Role }, orgI
     invalidateOrganization(orgId);
     await audit(prisma, actor.id, patch.plan && patch.plan !== before.plan ? "organization.plan_changed" : "organization.updated", "Organization", orgId, { from: before.plan, ...patch });
     return updated;
+}
+
+/** What the Organization settings screen shows: the org, its plan, seats and the plan catalogue. */
+export async function organizationOverview(org: Organization) {
+    const used = await seatsUsed(org.id);
+    return {
+        organization: org,
+        plan: PLANS[org.plan],
+        seats: { used, limit: seatLimitOf(org) },
+        plans: Object.values(PLANS),
+        featureLabels: FEATURE_LABELS,
+    };
 }
